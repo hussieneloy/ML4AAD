@@ -7,23 +7,47 @@ from smac.facade.func_facade import fmin_smac
 from mllab import find_cut_off
 
 
-def run_smac(python_path, w_dir, iter=5, input_file='../rawAllx1000.json', seeds=[1], task_ids=None):
+def run_smac(python_path, w_dir, n_iter=5, input_file='../rawAllx1000.json', seeds=[1], task_ids=None, max_tries=10):
 
     def test_func(cutoff):
-        result = find_cut_off.main(python_path=python_path, w_dir=w_dir, iter=iter, input_file=input_file,
+        result = find_cut_off.main(python_path=python_path, w_dir=w_dir, iter=n_iter, input_file=input_file,
                                    cutoffs=[cutoff], seeds=seeds, task_ids=task_ids)
-        return np.mean([y for _, y in result.items()])
+        cleaned = [x[1] for x in result if 0.0 < x[1] < 1.0]
+        mean = np.mean(cleaned) if cleaned else 0.0
+        mean = mean if mean != 1.0 else 0.0
+        return 1.0 - mean
 
-    # x, cost, smac = fmin_smac(func=test_func,
-    #                           x0=[-0],  # default values
-    #                           bounds=[(-5, 5)],  # bounds of each x
-    #                           maxfun=,  # maximal number of function evaluations
-    #                           rng=1234  # random seed
-    #                           )
-    #
-    # return x, cost, smac
+    x, cost, smac = fmin_smac(func=test_func,
+                              x0=[5],  # default values
+                              bounds=[(1, 99)],  # bounds of each x
+                              maxfun=max_tries,  # maximal iterations
+                              rng=1234  # random seed
+                              )
 
-    return test_func(5)
+    return x, cost, smac
+
+
+def plot(smac):
+    runhistory = smac.get_runhistory()
+
+    # extract x value and corresponding y value
+    x_smac = []
+    y_smac = []
+    for entry in runhistory.data:  # iterate over data because it is an OrderedDict
+        config_id = entry.config_id  # look up config id
+        config = runhistory.ids_config[config_id]  # look up config
+        y_ = runhistory.get_cost(config)  # get cost
+        x_ = config["x1"]  # there is only one entry in our example
+        if 0.0 < y_ < 1.0:
+            x_smac.append(x_)
+            y_smac.append(1 - y_)
+    x_smac = np.array(x_smac)
+    y_smac = np.array(y_smac)
+    p = x_smac.argsort()
+
+    plt.plot(x_smac[p], y_smac[p])
+    plt.grid()
+    plt.show()
 
 
 def clean_smac_shit():
@@ -35,13 +59,16 @@ def clean_smac_shit():
 
 
 def main(args):
-    run_smac(python_path=args.python_path, w_dir=args.working_dir, input_file=args.input_file,
-             iter=args.iter, seeds=args.seed, task_ids=args.tasks)
+    x, y, smac = run_smac(python_path=args.python_path, w_dir=args.working_dir, input_file=args.input_file,
+                          n_iter=args.iter, seeds=args.seed, task_ids=args.tasks, max_tries=args.smac_iter)
+    plot(smac)
+    clean_smac_shit()
 
 
 if __name__ == '__main__':
     calc_parser = argparse.ArgumentParser('benchmark')
     calc_parser.add_argument('-i', '--iter', default=5, type=int, help='number of iterations on each of the datasets')
+    calc_parser.add_argument('-I', '--smac-iter', default=10, type=int, help='number of SMAC iterations')
     calc_parser.add_argument('-s', '--seed', default=[1], type=int, nargs='+', help='random seeds')
     calc_parser.add_argument('-t', '--tasks', default=None, type=str, nargs='+', help='task IDs')
     calc_parser.add_argument('-S', '--save', default='cutoff.json', type=str, help='output json file')
