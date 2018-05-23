@@ -1,6 +1,6 @@
 import argparse
+import json
 import numpy as np
-import matplotlib.pyplot as plt
 
 from smac.facade.func_facade import fmin_smac
 
@@ -27,7 +27,7 @@ def run_smac(python_path, w_dir, n_iter=5, input_file='../rawAllx1000.json', see
     return x, cost, smac
 
 
-def plot(smac):
+def plot(smac, plot=False):
     runhistory = smac.get_runhistory()
 
     # extract x value and corresponding y value
@@ -41,13 +41,19 @@ def plot(smac):
         if 0.0 < y_ < 1.0:
             x_smac.append(x_)
             y_smac.append(1 - y_)
-    x_smac = np.array(x_smac)
-    y_smac = np.array(y_smac)
-    p = x_smac.argsort()
+        with open('benchmark-x.json', 'w') as f:
+            json.dump(x_smac, f)
+        with open('benchmark-y.json', 'w') as f:
+            json.dump(y_smac, f)
 
-    plt.plot(x_smac[p], y_smac[p])
-    plt.grid()
-    plt.show()
+    if plot:
+        x_smac = np.array(x_smac)
+        y_smac = np.array(y_smac)
+        p = x_smac.argsort()
+        import matplotlib.pyplot as plt
+        plt.plot(x_smac[p], y_smac[p])
+        plt.grid()
+        plt.show()
 
 
 def clean_smac_shit():
