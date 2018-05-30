@@ -1,0 +1,12 @@
+algo = python -u ./lpg/wrapper.py --mem-limit 3000 --problem-enc ./instances/encoding.pddl
+cutoff_time = 100
+feature_file = ./features.csv
+instance_file = ./training.txt
+test_instance_file = ./test.txt
+overall_obj = PAR10
+paramfile = ./lpg/params.pcs
+run_obj = runtime
+wallclock_limit = 200
+execdir = .
+deterministic = 0
+output_dir = smac-output
