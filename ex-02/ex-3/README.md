@@ -26,14 +26,10 @@ in the folder lpg-depots.
 
 The results of four independent runs on the cluster are listet in the result folder.
 
-Run 1
-![alt text](https://github.com/hussieneloy/ML4AAD/blob/branchsaskia/ex-02/ex-3/results/result1.png "Run 1")
+![run1](results/result1.png "Run 1")
 
-Run 2
-![alt text](https://github.com/hussieneloy/ML4AAD/blob/branchsaskia/ex-02/ex-3/results/result2.png "Run 2")
+![run2](results/result2.png "Run 2")
 
-Run 3
-![alt text](https://github.com/hussieneloy/ML4AAD/blob/branchsaskia/ex-02/ex-3/results/result3.png "Run 3")
+![run3](results/result3.png "Run 3")
 
-Run 4
-![alt text](https://github.com/hussieneloy/ML4AAD/blob/branchsaskia/ex-02/ex-3/results/result4.png "Run 4")
+![run4](results/result4.png "Run 4")
