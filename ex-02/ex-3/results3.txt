@@ -1,0 +1,59 @@
+*********************Incumbent Found:
+Configuration:
+  avoid_best_action_cycles, Value: '0'
+  bestfirst, Value: '1'
+  choose_min_numA_fact, Value: '1'
+  cri_insertion_add_mutex, Value: '0'
+  cri_intermediate_levels, Value: '1'
+  cri_update_iterations, Value: 0
+  criprecond, Value: '6'
+  donot_try_suspected_actions, Value: '1'
+  dynoiseTabLen, Value: 1.2
+  dynoisecoefnum, Value: 1.5
+  evaluate_mutex_for_action_remotion, Value: '0'
+  evaluate_threated_supported_preconds_of_neighb_action, Value: '0'
+  evaluation_function, Value: '1'
+  extended_effects_evaluation, Value: '0'
+  extended_unsupported_goals, Value: '0'
+  fast_best_action_evaluation, Value: '0'
+  h, Value: '3'
+  improve_reachability, Value: '0'
+  inc_re, Value: 1.16
+  initializeichoice, Value: '0'
+  inst_duplicate_param, Value: '0'
+  inst_with_contraddicting_objects, Value: '0'
+  maxnoise, Value: 60
+  mutex_and_additive_effects, Value: '1'
+  no_cut, Value: '0'
+  no_insert_threated_act_in_neighb, Value: '1'
+  no_mutex_with_additive_effects, Value: '0'
+  no_pruning, Value: '0'
+  noise, Value: 0.17314260406048992
+  noise_incr, Value: 1.25
+  nonuniform_random, Value: '0'
+  not_extended_unsupported_facts, Value: '1'
+  not_supported_preconds_evaluation, Value: '1'
+  numrestart, Value: '9'
+  numtry, Value: 500
+  relaxed_examination, Value: '0'
+  relaxed_neighborhood_evaluation, Value: '0'
+  remove_act_next_step, Value: '0'
+  reset_extended_unsupported_facts, Value: '0'
+  ri_list, Value: '0'
+  static_noise, Value: '0'
+  stop_remove_act, Value: '0'
+  tabu_act, Value: '1'
+  tabu_fct, Value: '1'
+  tabu_length, Value: 5
+  triomemory, Value: '0'
+  twalkplan, Value: '0'
+  verifyAf, Value: '0'
+  verifyinit, Value: '0'
+  vicinato, Value: '4'
+  walkplan, Value: '0'
+  weight_mutex_in_relaxed_plan, Value: 1.0
+  zero_num_A, Value: '0'
+
+[65.712, 0.828, 1.3, 1.152, 0.888, 1.308, 0.62, 0.716, 0.828, 16.544, 9.432, 0.732, 4.724, 0.908, 2.504, 1000.0, 0.792, 6.96, 0.74, 5.76, 0.632, 5.516, 5.932, 0.616, 8.952, 10.82, 0.444, 0.872, 47.532, 0.892, 1000.0, 0.976, 1.628, 0.54, 0.8, 0.616, 55.364, 18.788, 12.02, 3.776, 6.524, 45.024, 0.72, 0.988, 22.86, 1000.0, 0.404, 1.072, 0.816, 1000.0, 73.372, 0.972, 0.436, 0.856, 17.992, 1.672, 0.508, 1.24, 2.228, 2.568, 5.872, 0.56, 0.82, 0.78, 76.06, 0.72, 4.52, 12.856, 1.012, 0.728, 0.908, 2.56]
+[15.948, 5.524, 23.696, 4.78, 1.188, 3.704, 4.372, 3.636, 0.964, 1.116, 11.096, 46.004, 0.636, 1.016, 1.012, 2.388, 1.232, 3.292, 0.84, 1.748, 2.976, 0.6, 4.6, 2.976, 1.084, 1.468, 0.468, 3.2, 2.484, 1.044, 2.868, 1.096, 1.94, 2.932, 2.876, 0.9, 5.38, 8.956, 0.896, 19.7, 1.116, 48.516, 0.692, 11.612, 8.576, 1000.0, 0.584, 0.604, 3.252, 1.828, 1.392, 1.856, 0.396, 6.808, 5.036, 6.108, 0.812, 6.892, 0.792, 21.996, 0.528, 3.66, 1.024, 1.024, 1.368, 0.828, 15.332, 2.36, 11.016, 0.584, 1.084, 1.564]
+
