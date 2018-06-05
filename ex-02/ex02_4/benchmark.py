@@ -30,11 +30,13 @@ def run_smac(python_path, w_dir, n_iter=5, input_file='../rawAllx1000.json', see
 def run_roar(python_path, w_dir, n_iter=5, input_file='../rawAllx1000.json', seeds=[1], task_ids=None, max_tries=10):
 
     from smac.configspace import ConfigurationSpace
-    from ConfigSpace.hyperparameters import UniformFloatHyperparameter
+    from ConfigSpace.hyperparameters import UniformIntegerHyperparameter
     from smac.scenario.scenario import Scenario
     from smac.facade.roar_facade import ROAR
 
     def test_func(cutoff):
+        cutoff = cutoff.get('cutoff')
+        print(cutoff)
         result = find_cut_off.main(python_path=python_path, w_dir=w_dir, iter=n_iter, input_file=input_file,
                                    cutoffs=[cutoff], seeds=seeds, task_ids=task_ids)
         cleaned = [x[1] for x in result if 0.0 < x[1] < 1.0]
@@ -43,12 +45,13 @@ def run_roar(python_path, w_dir, n_iter=5, input_file='../rawAllx1000.json', see
         return 1.0 - mean
 
     cs = ConfigurationSpace()
-    cutoff_parameter = UniformFloatHyperparameter('cutoff', 1.0, 99.0, default_value=50.0)
+    cutoff_parameter = UniformIntegerHyperparameter('cutoff', 1, 99, default_value=50)
     cs.add_hyperparameter(cutoff_parameter)
     scenario = Scenario({"run_obj": "quality",   # we optimize quality (alternatively runtime)
                          "runcount-limit": max_tries,  # maximum function evaluations
                          "cs": cs,               # configuration space
-                         "deterministic": "true"
+                         "deterministic": "true",
+                         "abort_on_first_run_crash": "false",
                          })
 
     roar = ROAR(scenario=scenario, tae_runner=test_func, rng=1234)
