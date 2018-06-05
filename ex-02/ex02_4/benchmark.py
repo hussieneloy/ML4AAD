@@ -35,7 +35,7 @@ def run_roar(python_path, w_dir, n_iter=5, input_file='../rawAllx1000.json', see
     from smac.facade.roar_facade import ROAR
 
     def test_func(cutoff):
-        cutoff = cutoff.get('cutoff')
+        cutoff = cutoff.get('x1')
         print(cutoff)
         result = find_cut_off.main(python_path=python_path, w_dir=w_dir, iter=n_iter, input_file=input_file,
                                    cutoffs=[cutoff], seeds=seeds, task_ids=task_ids)
@@ -45,7 +45,7 @@ def run_roar(python_path, w_dir, n_iter=5, input_file='../rawAllx1000.json', see
         return 1.0 - mean
 
     cs = ConfigurationSpace()
-    cutoff_parameter = UniformIntegerHyperparameter('cutoff', 1, 99, default_value=50)
+    cutoff_parameter = UniformIntegerHyperparameter('x1', 1, 99, default_value=50)
     cs.add_hyperparameter(cutoff_parameter)
     scenario = Scenario({"run_obj": "quality",   # we optimize quality (alternatively runtime)
                          "runcount-limit": max_tries,  # maximum function evaluations
@@ -73,7 +73,7 @@ def plot(smac, plot=False):
         config_id = entry.config_id  # look up config id
         config = runhistory.ids_config[config_id]  # look up config
         y_ = runhistory.get_cost(config)  # get cost
-        x_ = config["x1"]  # there is only one entry in our example
+        x_ = config["x1"]
         if 0.0 < y_ < 1.0:
             x_smac.append(x_)
             y_smac.append(1 - y_)
