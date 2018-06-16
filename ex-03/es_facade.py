@@ -30,7 +30,7 @@ class ES(object):
                  rng: typing.Union[np.random.RandomState, int]=None,
                  es_class: ESOptimizer=None,
                  run_id: int=1):
-        
+
         aggregate_func = average_cost
 
         self.output_dir = create_output_directory(scenario, run_id)
@@ -145,7 +145,6 @@ class ES(object):
     def optimize(self):
         self.solver.start()
         self.solver.run()
-        pass
 
     def validate(self):
         pass
@@ -182,7 +181,7 @@ class ES(object):
 
 
 if __name__ == '__main__':
-    # use branin for testing since its the only algo with instances 
+    # use branin for testing since its the only algo with instances
     # in aclib already included
     # link to scenario file of branin must be adapted to own link
     scenario = Scenario("../../aclib2/scenarios/bbob/branin/scenario.txt")

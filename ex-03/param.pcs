@@ -1,0 +1,11 @@
+c [0.001, 1000] [1.0]
+kernel {"linear", "poly", "rbf", "sigmoid", "precomputed"} ["rbf"]
+shrinking {"true", "false"} ["true"]
+degree [1, 5] [3]
+coef0 [0.0, 10.0] [0.0]
+gamma [0.0001, 8.0] [1.0]
+
+Conditionals:
+degree | kernel in {"poly"}
+gamma | kernel in {"poly", "rbf", "sigmoid"}
+coef0 | kernel in {"poly", "sigmoid"}
