@@ -60,7 +60,7 @@ class ES(object):
         pass
 
     def age_test(self, threshold, nc_list, c_list):
-        # maybe using c_pop and nc_pop
+        # maybe using c_pop and nc_pop as parameter
         for mem in nc_list:
             mem.increase_age()
             if(mem.age >= threshold):
