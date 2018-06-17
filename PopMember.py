@@ -11,4 +11,6 @@ class PopMember(object):
         self.gender = gender
 
     def increase_age(self):
+    """ Function to increase age
+    """
         self.age += 1
