@@ -55,7 +55,10 @@ class ESCLI(object):
         optimizer = ES(
             scenario=scen,
             rng=np.random.RandomState(args_.seed),
-            run_id=args_.seed
+            run_id=args_.seed,
+            X= args_.X,
+            M=args_.M,
+            A=args_.A
         )
 
         try:

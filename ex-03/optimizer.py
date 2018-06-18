@@ -23,7 +23,10 @@ class ESOptimizer(object):
                  intensifier: Intensifier,
                  aggregate_func: callable,
                  rng: np.random.RandomState,
-                 restore_incumbent: Configuration=None):
+                 restore_incumbent: Configuration=None,
+                 X: int=10,
+                 M: int=10,
+                 A: int=3):
         
         self.incumbent = restore_incumbent
         self.scenario = scenario
@@ -32,6 +35,9 @@ class ESOptimizer(object):
         self.intensifier = intensifier
         self.aggregate_func = aggregate_func
         self.rng = rng
+        self.X = X
+        self.M = M
+        self.A = A
 
     # Ideas for splitting functionality
 

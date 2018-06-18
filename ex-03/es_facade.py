@@ -29,7 +29,10 @@ class ES(object):
                  runhistory: RunHistory=None,
                  intensifier: Intensifier=None,
                  rng: typing.Union[np.random.RandomState, int]=None,
-                 run_id: int=1):
+                 run_id: int=1,
+                 X: int=10,
+                 M: int=10,
+                 A: int=3):
         
         aggregate_func = average_cost
 
@@ -133,7 +136,10 @@ class ES(object):
             # 'model': model,
             # 'acq_optimizer': acquisition_function_optimizer,
             # 'acquisition_func': acquisition_function,
-            'rng': rng
+            'rng': rng,
+            'X': X,
+            'M': M,
+            'A': A
         }
 
         self.solver = ESOptimizer(**es_args)
