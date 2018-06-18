@@ -1,7 +1,13 @@
 
 import os
 import logging
-from argpars import ArgumentParser, ArgumentDefaultsHelpFormatter, SUPPRESS
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, SUPPRESS
+
+
+# X [1,100] [10]
+# M [1,100] [10]
+# A [1, 10] [3]
+
 
 class CMDReader(object):
 
@@ -33,12 +39,20 @@ class CMDReader(object):
         req_opts.add_argument("--verbose_level", default=logging.INFO,
                               choices=["INFO", "DEBUG"],
                               help="verbose level")
-        req_opts.add_argument("--mode", default="SMAC",
-                              choices=["SMAC", "ROAR", "EPILS"],
-                              help="Configuration mode.")
-        req_opts.add_argument("--restore_state", default=None,
-                              help="Path to dir with SMAC-files.")
-        #deleted everything with warmstart (not needed)
+        req_opts.add_argument("--X",
+                              help="percentage, select top X percent of competitive for mating",
+                              type=int,
+                              default=10)
+        req_opts.add_argument("--M",
+                              help="percentage, with prop M variable of config is mutated",
+                              type=int,
+                              default=10)
+        req_opts.add_argument("--A",
+                              help="max. age of population member",
+                              type=int,
+                              default=3)
+
+        # deleted everything with warmstart (not needed)
         args_, misc = parser.parse_known_args()
         self._check_args(args_)
 
@@ -46,7 +60,7 @@ class CMDReader(object):
         misc = dict((k.lstrip("-"), v.strip("'"))
                     for k, v in zip(misc[::2], misc[1::2]))
 
-return args_, misc
+        return args_, misc
 
     def _check_args(self, args_):
         """Checks command line arguments (e.g., whether all given files exist)
@@ -61,3 +75,12 @@ return args_, misc
         """
         if not os.path.isfile(args_.scenario_file):
             raise ValueError("Not found: %s" % (args_.scenario_file))
+
+        print(args_)
+
+        if args_.X < 1 or args_.X > 100:
+            raise ValueError("X is an percentage and must be in [1, 100]")
+        if args_.M < 1 or args_.M > 100:
+            raise ValueError("M is an percentage and must be in [1, 100]")
+        if args_.A < 1:
+            raise ValueError("Killing age must be a positive integer")

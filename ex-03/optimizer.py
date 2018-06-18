@@ -6,9 +6,10 @@ from smac.runhistory.runhistory import RunHistory
 from smac.scenario.scenario import Scenario
 from smac.utils.io.traj_logging import TrajLogger
 import ConfigSpace.util
+from smac.tae.execute_ta_run import FirstRunCrashedException
 
 
-class ES(object):
+class ESOptimizer(object):
 
     """Interface that contains the main Evolutionary optimizer
 
@@ -26,7 +27,7 @@ class ES(object):
         
         self.incumbent = restore_incumbent
         self.scenario = scenario
-        self.confi_space = scenario.cs
+        self.config_space = scenario.cs
         self.runhistory = runhistory
         self.intensifier = intensifier
         self.aggregate_func = aggregate_func

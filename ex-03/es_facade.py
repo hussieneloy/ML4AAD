@@ -11,8 +11,10 @@ from smac.intensification.intensification import Intensifier
 from smac.utils.io.traj_logging import TrajLogger
 from smac.configspace import Configuration
 from smac.optimizer.objective import average_cost
+from smac.utils.constants import MAXINT
+from smac.utils.io.output_directory import create_output_directory
 
-from optimizer import ES
+from optimizer import ESOptimizer
 
 
 class ES(object):
@@ -23,14 +25,16 @@ class ES(object):
     def __init__(self,
                  scenario: Scenario,
                  tae_runner: typing.Union[ExecuteTARun, typing.Callable]=None,
-                 tats: Stats=None,
+                 stats: Stats=None,
                  runhistory: RunHistory=None,
                  intensifier: Intensifier=None,
                  rng: typing.Union[np.random.RandomState, int]=None,
-                 es_class: ES=None,
                  run_id: int=1):
         
         aggregate_func = average_cost
+
+        self.output_dir = create_output_directory(scenario, run_id)
+        scenario.write()
 
         # initialize stats object
         if stats:
@@ -97,7 +101,7 @@ class ES(object):
                                       traj_logger=traj_logger,
                                       rng=rng,
                                       instances=scenario.train_insts,
-                                      cuttoff=scenario.cuttoff,
+                                      cutoff=scenario.cutoff,
                                       deterministic=scenario.deterministic,
                                       run_obj_time=scenario.run_obj == "runtime",
                                       always_race_against=scenario.cs.get_default_configuration() \
@@ -119,29 +123,54 @@ class ES(object):
 
         es_args = {
             'scenario': scenario,
-            'stats': self.stats,
+            # 'stats': self.stats,
             # 'initial_design': initial_design,
             'runhistory': runhistory,
             # 'runhistory2epm': runhistory2epm,
             'intensifier': intensifier,
             'aggregate_func': aggregate_func,
-            'num_run': num_run,
+            # 'num_run': num_run,
             # 'model': model,
             # 'acq_optimizer': acquisition_function_optimizer,
             # 'acquisition_func': acquisition_function,
-            'rng': rng,
-            # 'restore_incumbent': restore_incumbent
+            'rng': rng
         }
 
-        if es_class is None:
-            self.solver = ES(**es_args)
-        else:
-            self.solver = es_class(**es_args)
+        self.solver = ESOptimizer(**es_args)
 
     def optimize(self):
-
-        self.intensifi
         pass
 
     def validate(self):
         pass
+
+    def _get_rng(self, rng):
+        """Initialize random number generator
+
+        If rng is None, initialize a new generator
+        If rng is Int, create RandomState from that
+        If rng is RandomState, return it
+
+        Parameters
+        ----------
+        rng: np.random.RandomState|int|None
+
+        Returns
+        -------
+        int, np.random.RandomState
+        """
+        # initialize random number generator
+        if rng is None:
+            self.logger.debug('no rng given: using default seed of 1')
+            num_run = 1
+            rng = np.random.RandomState(seed=num_run)
+        elif isinstance(rng, int):
+            num_run = rng
+            rng = np.random.RandomState(seed=rng)
+        elif isinstance(rng, np.random.RandomState):
+            num_run = rng.randint(MAXINT)
+            rng = rng
+        else:
+            raise TypeError('Unknown type %s for argument rng. Only accepts '
+                            'None, int or np.random.RandomState' % str(type(rng)))
+        return num_run, rng
