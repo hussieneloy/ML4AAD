@@ -221,7 +221,7 @@ class ESOptimizer(object):
             return param.name, val
         else:
             idx = np.random.random_integers(0, param._num_choices)
-            choices_list = list(choices)
+            choices_list = list(sequence)
             val = choices_list[idx]
             return param.name, val
 
