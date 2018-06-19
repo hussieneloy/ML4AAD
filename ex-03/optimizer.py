@@ -1,4 +1,5 @@
 import numpy as np
+import threading
 import time
 import math
 import random
@@ -47,13 +48,15 @@ class ESOptimizer(object):
         self.rng = rng
         self.nc_pop = []
         self.c_pop = []
+        self.attractive = []
+        self.unattractive = []
 
     # Ideas for splitting functionality
 
     def start(self):
         self.stats.start_timing()
 
-    def run(self):
+    def run(self, extension=False):
         self.start()
         # Give a chance for the default confiugration
         default_conf = self.config_space.get_default_confiugration()
@@ -87,13 +90,14 @@ class ESOptimizer(object):
             chosen_ncomp = (200.0 / A) / 100.0
             chosen_ncomp *= len(self.nc_pop)
             chosen_ncomp = int(math.ceil(chosen_ncomp))
-            for c in best_c:
-                # Mate each one of C with random multiple ones from NC
-                start_time = time.time()
-                nc = random.sample(self.nc_pop, chosen_ncomp)
-                time_spent = time.time() - start_time
-                time_left = self._get_timebound_for_intensification(time_spent)
-                self.mate(c, nc, time_left)
+
+            # Checking if the extension applies
+            if extension:
+                self.selected_mating(best_c, chosen_ncomp)
+            else:
+                self.vanilla_mating(best_c, chosen_ncomp)
+
+            
             # Add one more year to each population member
             """
             for c in self.c_pop:
@@ -112,7 +116,111 @@ class ESOptimizer(object):
         return self.incumbent
 
 
+    def vanilla_mating(self, best_c, chosen_ncomp):
+        """
+        The function mates each competitive member with a random 
+        percentage of th uncompetitive members
+        """
+        for c in best_c:
+            # Mate each one of C with random multiple ones from NC
+            start_time = time.time()
+            nc = random.sample(self.nc_pop, chosen_ncomp)
+            time_spent = time.time() - start_time
+            time_left = self._get_timebound_for_intensification(time_spent)
+            self.mate(c, nc, time_left)
 
+
+    def selected_mating(self, best_c, chosen_ncomp):
+        """
+        The function mates each competitive member with a 
+        percentage of th uncompetitive members based on how 
+        fit the uncompetive heurstically.
+        """
+        for c in best_c:
+            self.attractive, self.unattractive = [], []
+            nc_size = len(self.nc_pop)
+            # Permutation of the indexes of The NC population
+            # which is changeable with each C member
+            nc_perm = np.random.permutation(nc_size)
+            mid = int(nc_size / 2)
+
+            for idx in range(mid):
+                first_idx = nc_perm[idx]
+                second_idx = nc_perm[idx + mid]
+                # Comparing pairs of NC members in parallel 
+                comp = threading.Thread(target=self.pairwise_comp, 
+                                        args(first_idx, second_idx))
+                comp.start()
+
+            # In case of odd NC population size, the single one is
+            # added to the attractive.
+            if nc_size % 2 == 1:
+                self.attractive.append(nc_size - 1)
+
+            # Waiting till all threads are done
+            time.sleep(3)
+            # Giving the attractive members twice the chances of 
+            # mating compared to the unattractive ones.
+            attract_prob = 1.0 / 3.0
+            nc_list = []
+
+            # Filling the list of the NC members
+            for idx in range(chosen_ncomp):
+                choose_prop = np.random.random_sample()
+                size_att = len(self.attractive)
+                size_unatt = len(self.unattractive)
+
+                # The condition checks if an atractive member should
+                # be picked and that attractive members are not all 
+                # matched.
+                if choose_prop > attract_prob and size_att > 0:
+                    att_idx = np.random.randint(size_att)
+                    pop_num = self.attractive[att_idx]
+                    del self.attractive[att_idx]
+                    nc_list.append(self.nc_pop[pop_num]) 
+                else:
+                    unatt_idx = np.random.randint(size_unatt)
+                    pop_num = self.unattractive[unatt_idx]
+                    del self.unattractive[unatt_idx]
+                    nc_list.append(self.nc_pop[pop_num])
+
+                # The condition handles the rare case when an unattractive
+                # member should be picked and all unattractive members are
+                # all matched.
+                if choose_prop <= attract_prob and size_unatt == 0:
+                    att_idx = np.random.randint(size_att)
+                    pop_num = self.attractive[att_idx]
+                    del self.attractive[att_idx]
+                    nc_list.append(self.nc_pop[pop_num])
+
+            start_time = time.time()
+            time_spent = time.time() - start_time
+            time_left = self._get_timebound_for_intensification(time_spent)
+            self.mate(c, nc_list, time_left)
+                        
+
+                
+
+    def pairwise_comp(self, idx1, idx2):
+        """
+        The method accepts 2 indexes of the NC competitives and 
+        race their members configurations and send the winner to
+        the attractive pile and the loser to the unattractive one.
+        """ 
+        start_time = time.time()
+        first_conf = self.nc_pop[idx1].config
+        second_conf = self.nc_pop[idx2].config
+        time_spent = time.time() - start_time
+        time_left = self._get_timebound_for_intensification(time_spent)
+        winner = self.race_configs([first_conf, second_conf])
+        if winner == first_conf:
+            self.attractive.append(idx1)
+            self.unattractive.append(idx2)
+        else:
+            self.unattractive.append(idx1)
+            self.attractive.append(idx2)
+        return
+        
 
     def mutate(self, config):
         pass
