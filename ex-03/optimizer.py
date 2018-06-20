@@ -75,6 +75,7 @@ class ESOptimizer(object):
         self.c_pop.append(first_pop)
 
         # Initializing further 19 elements to be the initial population.
+        self.initial_pop = 8
         for i in range(self.initialPop - 1):
             start_time = time.time()
             conf = self.generate_random_configuration()
@@ -88,6 +89,7 @@ class ESOptimizer(object):
                 self.nc_pop.append(pop_mem)
 
         while not self.stats.is_budget_exhausted():
+            
             # The main loop is broken when budget is exhausted.
             self.incumbent = self.c_pop[0].config
             # Best X % in C
@@ -114,7 +116,12 @@ class ESOptimizer(object):
             self.incumbent = self.c_pop[0].config
             # Killing old members
             self.kill_old()
-
+            
+        self.incumbent = self.c_pop[0].config
+        print("Incumbent is :")
+        print(self.incumbent)
+        print("With Cost")
+        print(self.runhistory.get_cost(self.incumbent))
         return self.incumbent
 
     def vanilla_mating(self, best_c, chosen_ncomp):
@@ -231,34 +238,38 @@ class ESOptimizer(object):
         while lo < hi:
             mid = int((lo + hi) / 2)
             list_conf = self.c_pop[mid].config
-            if mid == 0:
-                winner = self.race_configs([list_conf, configuration], time_left)
-                if winner == configuration:
-                    self.c_pop.insert(0, member)
-                    return
-                else:
-                    self.c_pop.insert(1, member)
-                    return
-            elif mid == len(self.c_pop) - 1:
-                winner = self.race_configs([list_conf, configuration], time_left)
-                if winner == configuration:
-                    self.c_pop.insert(len(self.c_pop) - 1, member)
-                    return
-                else:
-                    self.c_pop.append(member)
-                    return
+            
+            #print(list_conf)
+            #print(configuration)
+            winner = self.race_configs([list_conf, configuration], time_left)
+            #print('=')
+            #print(winner)
+            if winner == configuration:
+                hi = mid - 1
             else:
-                winner = self.race_configs([list_conf, configuration], time_left)
-                if winner == configuration:
-                    lo = mid
-                else:
-                    hi = mid
-        list_conf = self.c_pop[lo].config
-        winner = self.race_configs([list_conf, configuration], time_left)
-        if winner == configuration:
-            self.c_pop.insert(lo, member)
+                lo = mid + 1
+        if lo == len(self.c_pop):
+            self.c_pop.append(member)
         else:
-            self.c_pop.insert(lo + 1, member)
+            list_conf = self.c_pop[lo].config
+            #print(list_conf)
+            #print(configuration)
+            winner = self.race_configs([list_conf, configuration], time_left)
+            #print('=')
+            #print(winner)
+            if winner == configuration:
+                self.c_pop.insert(lo, member)
+            else:
+                self.c_pop.insert(lo + 1, member)
+            #print('-')
+            #print('-')
+        """
+        for c in self.c_pop:
+           print(c.config,end=',')
+        print('-')
+        print('-')
+        print(self.runhistory.get_all_configs())
+        """
 
     def is_young(self, member):
         # The function checks if a population member is young enough.
@@ -384,16 +395,18 @@ class ESOptimizer(object):
 
         """
         # print("Time left: %s" % (max(self.intensifier._min_time, time_left)))
-
-        best, inc_perf = self.intensifier.intensify(
-            challengers=[set_of_conf[1]],
-            incumbent=set_of_conf[0],
-            run_history=self.runhistory,
-            aggregate_func=self.aggregate_func,
-            time_bound=max(self.intensifier._min_time, time_left)
-            # time_bound=10
-        )
-        return best
+        try:
+            best, inc_perf = self.intensifier.intensify(
+                challengers=[set_of_conf[1]],
+                incumbent=set_of_conf[0],
+                run_history=self.runhistory,
+                aggregate_func=self.aggregate_func,
+                time_bound=max(self.intensifier._min_time, time_left)
+                # time_bound=10
+            )
+            return best
+        except:
+            return
         # print("Incumbent: %s" % (self.incumbent))
         # print("Performance: %s" % (inc_perf))
 
