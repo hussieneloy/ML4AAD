@@ -13,8 +13,9 @@ from smac.stats.stats import Stats
 # from smac.utils.merge_foreign_data import merge_foreign_data_from_file
 # from smac.utils.io.traj_logging import TrajLogger
 # from smac.utils.io.input_reader import InputReader
-# from smac.tae.execute_ta_run import TAEAbortException, FirstRunCrashedException
+from smac.tae.execute_ta_run import TAEAbortException, FirstRunCrashedException
 # from smac.utils.io.output_directory import create_output_directory
+
 
 class ESCLI(object):
 
@@ -56,9 +57,11 @@ class ESCLI(object):
             scenario=scen,
             rng=np.random.RandomState(args_.seed),
             run_id=args_.seed,
-            X= args_.X,
+            X=args_.X,
             M=args_.M,
-            A=args_.A
+            A=args_.A,
+            initialPop=args_.initialPop,
+            extension=args_.extension
         )
 
         try:

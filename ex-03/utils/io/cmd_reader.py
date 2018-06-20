@@ -51,6 +51,14 @@ class CMDReader(object):
                               help="max. age of population member",
                               type=int,
                               default=3)
+        req_opts.add_argument("--initialPop",
+                              help="number of initial Population, half will be competitive and half non-competitive",
+                              type=int,
+                              default=20)
+        req_opts.add_argument("--extension",
+                              help="using extension with sexual selection if true, else standard selection",
+                              type=bool,
+                              default=False)
 
         # deleted everything with warmstart (not needed)
         args_, misc = parser.parse_known_args()

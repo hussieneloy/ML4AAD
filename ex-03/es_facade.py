@@ -32,7 +32,9 @@ class ES(object):
                  run_id: int=1,
                  X: int=10,
                  M: int=10,
-                 A: int=3):
+                 A: int=3,
+                 initialPop: int=20,
+                 extension: bool=False):
         
         aggregate_func = average_cost
 
@@ -126,7 +128,7 @@ class ES(object):
 
         es_args = {
             'scenario': scenario,
-            # 'stats': self.stats,
+            'stats': self.stats,
             # 'initial_design': initial_design,
             'runhistory': runhistory,
             # 'runhistory2epm': runhistory2epm,
@@ -139,13 +141,15 @@ class ES(object):
             'rng': rng,
             'X': X,
             'M': M,
-            'A': A
+            'A': A,
+            'initialPop': initialPop,
+            'extension': extension
         }
 
         self.solver = ESOptimizer(**es_args)
 
     def optimize(self):
-        pass
+        self.solver.run()
 
     def validate(self):
         pass

@@ -4,24 +4,25 @@ import time
 import math
 import random
 
-from smac.configspace import Configuration, ConfigurationSpace
+import ConfigSpace
+from smac.configspace import Configuration
 from smac.intensification.intensification import Intensifier
 from smac.runhistory.runhistory import RunHistory
 from smac.scenario.scenario import Scenario
 from smac.stats.stats import Stats
 from smac.utils.io.traj_logging import TrajLogger
 from ConfigSpace.util import get_random_neighbor
-from ConfigSpace.hyperparameters import Hyperparameter
+from ConfigSpace.hyperparameters import Hyperparameter, CategoricalHyperparameter
+from ConfigSpace.hyperparameters import FloatHyperparameter, UniformIntegerHyperparameter, Constant
 from PopMember import PopMember
 
 
 class ESOptimizer(object):
 
     # ES Parameters
-    X = .1
+
     P = .5
-    M = .1
-    A = 3
+
     S = .1
 
     """Interface that contains the main Evolutionary optimizer
@@ -37,14 +38,14 @@ class ESOptimizer(object):
                  intensifier: Intensifier,
                  aggregate_func: callable,
                  rng: np.random.RandomState,
-
                  X: int=10,
                  M: int=10,
-                 A: int=3):
+                 A: int=3,
+                 initialPop: int=20,
+                 extension: bool=False):
         
         self.incumbent = scenario.cs.get_default_configuration()
         self.scenario = scenario
-        self.config_space = scenario.cs
         self.stats = stats
         self.runhistory = runhistory
         self.intensifier = intensifier
@@ -54,32 +55,31 @@ class ESOptimizer(object):
         self.c_pop = []
         self.attractive = []
         self.unattractive = []
-	self.X = X
+        self.X = X
         self.M = M
         self.A = A
+        self.initialPop = initialPop
+        self.extension = extension
 
     # Ideas for splitting functionality
 
     def start(self):
         self.stats.start_timing()
 
-    def run(self, extension=False):
+    def run(self):
         self.start()
+
         # Give a chance for the default confiugration
-        default_conf = self.config_space.get_default_confiugration()
-        first_pop = PopMember(config: default_conf, 
-                              age: np.random.randint(A) + 1,
-                              0)
-        self.c_pop.append(default_conf)
+        default_conf = self.scenario.cs.get_default_configuration()
+        first_pop = PopMember(default_conf, np.random.randint(self.A) + 1, 0)
+        self.c_pop.append(PopMember(default_conf, 0, 0))
 
         # Initializing further 19 elements to be the initial population.
-        for i in range(19):
+        for i in range(self.initialPop - 1):
             start_time = time.time()
             conf = self.generate_random_configuration()
             gender = np.random.randint(1000) % 2
-            pop_mem = PopMember(config: conf, 
-                                age: np.random.randint(A) + 1,
-                                gender)
+            pop_mem = PopMember(conf, np.random.randint(self.A) + 1, gender)
             time_spent = time.time() - start_time
             time_left = self._get_timebound_for_intensification(time_spent)
             if gender == 0:
@@ -87,45 +87,39 @@ class ESOptimizer(object):
             else:
                 self.nc_pop.append(pop_mem)
 
-        while True:
+        while not self.stats.is_budget_exhausted():
             # The main loop is broken when budget is exhausted.
             self.incumbent = self.c_pop[0].config
             # Best X % in C
             chosen_comp = int(math.ceil(X * len(self.c_pop)))
             best_c = self.c_pop[:chosen_comp]
             # The number of members chosen from NC
-            chosen_ncomp = (200.0 / A) / 100.0
+            chosen_ncomp = (200.0 / self.A) / 100.0
             chosen_ncomp *= len(self.nc_pop)
             chosen_ncomp = int(math.ceil(chosen_ncomp))
 
             # Checking if the extension applies
-            if extension:
+            if self.extension:
                 self.selected_mating(best_c, chosen_ncomp)
             else:
                 self.vanilla_mating(best_c, chosen_ncomp)
 
-            
             # Add one more year to each population member
-            """
             for c in self.c_pop:
-                c.add_year()
+                c.increase_age()
             for nc in self.nc_pop:
-                nc.add_year()
-            """
+                nc.increase_age()
+
             # The incumbent is first configuration in C
             self.incumbent = self.c_pop[0].config
             # Killing old members
             self.kill_old()
 
-            if self.stats.is_budget_exhausted():
-                break
-
         return self.incumbent
-
 
     def vanilla_mating(self, best_c, chosen_ncomp):
         """
-        The function mates each competitive member with a random 
+        The function mates each competitive member with a random
         percentage of th uncompetitive members
         """
         for c in best_c:
@@ -135,7 +129,6 @@ class ESOptimizer(object):
             time_spent = time.time() - start_time
             time_left = self._get_timebound_for_intensification(time_spent)
             self.mate(c, nc, time_left)
-
 
     def selected_mating(self, best_c, chosen_ncomp):
         """
@@ -154,9 +147,8 @@ class ESOptimizer(object):
             for idx in range(mid):
                 first_idx = nc_perm[idx]
                 second_idx = nc_perm[idx + mid]
-                # Comparing pairs of NC members in parallel 
-                comp = threading.Thread(target=self.pairwise_comp, 
-                                        args(first_idx, second_idx))
+                # Comparing pairs of NC members in parallel
+                comp = threading.Thread(self.pairwise_comp, args(first_idx, second_idx))
                 comp.start()
 
             # In case of odd NC population size, the single one is
@@ -204,9 +196,6 @@ class ESOptimizer(object):
             time_spent = time.time() - start_time
             time_left = self._get_timebound_for_intensification(time_spent)
             self.mate(c, nc_list, time_left)
-                        
-
-                
 
     def pairwise_comp(self, idx1, idx2):
         """
@@ -227,15 +216,14 @@ class ESOptimizer(object):
             self.unattractive.append(idx1)
             self.attractive.append(idx2)
         return
-        
 
     def mutate(self, config):
         pass
 
     def insert_c(self, member, time_left):
         """
-        The function uses binary search to insert a new configuration into 
-        readily sorted list of competitive configurations in its proper place. 
+        The function uses binary search to insert a new configuration into
+        readily sorted list of competitive configurations in its proper place.
         """
         lo = 0
         hi = len(self.c_pop)
@@ -272,10 +260,9 @@ class ESOptimizer(object):
         else:
             self.c_pop.insert(lo + 1, member)
 
-
     def is_young(self, member):
         # The function checks if a population member is young enough.
-        return member.age <= A
+        return member.age <= self.A
 
     def kill_old(self):
         # The function kills all old members except the incumbent
@@ -286,16 +273,13 @@ class ESOptimizer(object):
         self.c_pop = c_pop_cpy
         self.nc_pop = [pop for pop in self.nc_pop if self.is_young(pop)]
 
-
-
-        
     def generate_random_configuration(self):
-        """ 
-        The function generates random configurations by randomizing each 
-        hyparameters in the configuration until a valid configuration is 
+        """
+        The function generates random configurations by randomizing each
+        hyparameters in the configuration until a valid configuration is
         returned.
         """
-        hyper_params = self.config_space.get_hyperparameters()
+        hyper_params = self.scenario.cs.get_hyperparameters()
         candidate_conf = None
         found = False
         while not found:
@@ -304,18 +288,16 @@ class ESOptimizer(object):
                 key, val = self.random_parameter(param)
                 values[key] = val
             try:
-                candidate_conf = Configuration(configuration_space: self.config_space
-                    ,values: values
-                    ,allow_inactive_with_values: True)
+                candidate_conf = Configuration(configuration_space=self.scenario.cs,
+                                               values=values,
+                                               allow_inactive_with_values=True)
                 found = True
             except ValueError as e:
                 continue
         return candidate_conf
 
-
-
     def random_parameter(self, param):
-        # The function accepts a hyperparameter and returns random 
+        # The function accepts a hyperparameter and returns random
         # value accordingly.
         if isinstance(param, Constant):
             return param.name, param.value
@@ -339,9 +321,6 @@ class ESOptimizer(object):
             choices_list = list(sequence)
             val = choices_list[idx]
             return param.name, val
-
-    def get_parents(self):
-        pass
 
     def cross(self, parent1, parent2):
         """Crosses two configuration and creates a new one.
