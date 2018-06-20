@@ -217,8 +217,9 @@ class ESOptimizer(object):
             self.attractive.append(idx2)
         return
 
-    def mutate(self, config):
-        pass
+    def mutate(self, config: Configuration):
+        completely_mutated = config.configuration_space.sample_configuration()
+        return self.cross(completely_mutated, config)
 
     def insert_c(self, member, time_left):
         """
