@@ -75,7 +75,6 @@ class ESOptimizer(object):
         self.c_pop.append(first_pop)
 
         # Initializing further 19 elements to be the initial population.
-        self.initial_pop = 8
         for i in range(self.initialPop - 1):
             start_time = time.time()
             conf = self.generate_random_configuration()
