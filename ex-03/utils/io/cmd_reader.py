@@ -51,7 +51,7 @@ class CMDReader(object):
                               help="max. age of population member",
                               type=int,
                               default=3)
-        req_opts.add_argument("--initialPop",
+        req_opts.add_argument("--initial_pop",
                               help="number of initial Population, half will be competitive and half non-competitive",
                               type=int,
                               default=20)

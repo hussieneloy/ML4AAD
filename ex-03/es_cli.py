@@ -60,7 +60,7 @@ class ESCLI(object):
             X=args_.X,
             M=args_.M,
             A=args_.A,
-            initialPop=args_.initialPop,
+            initialPop=args_.initial_pop,
             extension=args_.extension
         )
 

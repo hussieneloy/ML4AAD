@@ -5,6 +5,7 @@ import math
 import random
 
 import ConfigSpace
+import math
 from smac.configspace import Configuration
 from smac.intensification.intensification import Intensifier
 from smac.runhistory.runhistory import RunHistory
@@ -18,13 +19,6 @@ from PopMember import PopMember
 
 
 class ESOptimizer(object):
-
-    # ES Parameters
-
-    P = .5
-
-    S = .1
-
     """Interface that contains the main Evolutionary optimizer
 
     Attributes:
@@ -43,7 +37,7 @@ class ESOptimizer(object):
                  A: int=3,
                  initialPop: int=20,
                  extension: bool=False):
-        
+
         self.incumbent = scenario.cs.get_default_configuration()
         self.scenario = scenario
         self.stats = stats
@@ -88,7 +82,7 @@ class ESOptimizer(object):
                 self.nc_pop.append(pop_mem)
 
         while not self.stats.is_budget_exhausted():
-            
+
             # The main loop is broken when budget is exhausted.
             self.incumbent = self.c_pop[0].config
             # Best X % in C
@@ -115,7 +109,7 @@ class ESOptimizer(object):
             self.incumbent = self.c_pop[0].config
             # Killing old members
             self.kill_old()
-            
+
         self.incumbent = self.c_pop[0].config
         print("Incumbent is :")
         print(self.incumbent)
@@ -154,7 +148,7 @@ class ESOptimizer(object):
                 first_idx = nc_perm[idx]
                 second_idx = nc_perm[idx + mid]
                 # Comparing pairs of NC members in parallel
-                comp = threading.Thread(self.pairwise_comp, args(first_idx, second_idx))
+                comp = threading.Thread(target=self.pairwise_comp, args=(first_idx, second_idx))
                 comp.start()
 
             # In case of odd NC population size, the single one is
@@ -214,7 +208,7 @@ class ESOptimizer(object):
         second_conf = self.nc_pop[idx2].config
         time_spent = time.time() - start_time
         time_left = self._get_timebound_for_intensification(time_spent)
-        winner = self.race_configs([first_conf, second_conf])
+        winner = self.race_configs([first_conf, second_conf], time_left)
         if winner == first_conf:
             self.attractive.append(idx1)
             self.unattractive.append(idx2)
@@ -225,7 +219,7 @@ class ESOptimizer(object):
 
     def mutate(self, config: Configuration):
         completely_mutated = config.configuration_space.sample_configuration()
-        return self.cross(completely_mutated, config)
+        return self.cross(completely_mutated, config, self.M)
 
     def insert_c(self, member, time_left):
         """
@@ -333,9 +327,9 @@ class ESOptimizer(object):
             val = choices_list[idx]
             return param.name, val
 
-    def cross(self, parent1, parent2):
+    def cross(self, parent1, parent2, percent):
         """Crosses two configuration and creates a new one.
-        Randomly select value from either parent for each
+        With probability percent choose value from parent1 for each
         hyperparameter that is not dependent on any other,
         then also include children of this hp from same parent.
         """
@@ -348,7 +342,7 @@ class ESOptimizer(object):
             # print("Hyperparameter: %s" % (name))
             if name not in new_values.keys() and cs.get_parents_of(name) == []:
                 ran = np.random.randint(100)
-                if ran % 2 == 0:
+                if ran % math.ceil(100 / percent) == 0:
                     parent = parent1.get_dictionary()
                 else:
                     parent = parent2.get_dictionary()
@@ -376,10 +370,10 @@ class ESOptimizer(object):
         for nc in nc_list:
             
             # cross both partner, get new config
-            new_conf = self.cross(c.config, nc.config)
+            new_conf = self.cross(c.config, nc.config, 50)
 
             # mutate configuration
-            new_conf = mutate(new_conf)
+            new_conf = self.mutate(new_conf)
 
             # create new child, randomly set gender
             g = np.random.randint(0, 1000)
