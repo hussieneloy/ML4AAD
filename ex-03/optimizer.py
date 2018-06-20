@@ -380,7 +380,7 @@ class ESOptimizer(object):
             new_conf = self.cross(c.config, nc.config)
 
             # mutate configuration
-            # new_conf = mutate(new_conf)
+            new_conf = mutate(new_conf)
 
             # create new child, randomly set gender
             g = np.random.randint(0, 1000)
