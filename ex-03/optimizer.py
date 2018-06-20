@@ -55,7 +55,7 @@ class ESOptimizer(object):
         self.c_pop = []
         self.attractive = []
         self.unattractive = []
-        self.X = X
+        self.X = X 
         self.M = M
         self.A = A
         self.initialPop = initialPop
@@ -72,7 +72,7 @@ class ESOptimizer(object):
         # Give a chance for the default confiugration
         default_conf = self.scenario.cs.get_default_configuration()
         first_pop = PopMember(default_conf, np.random.randint(self.A) + 1, 0)
-        self.c_pop.append(PopMember(default_conf, 0, 0))
+        self.c_pop.append(first_pop)
 
         # Initializing further 19 elements to be the initial population.
         for i in range(self.initialPop - 1):
@@ -91,7 +91,7 @@ class ESOptimizer(object):
             # The main loop is broken when budget is exhausted.
             self.incumbent = self.c_pop[0].config
             # Best X % in C
-            chosen_comp = int(math.ceil(X * len(self.c_pop)))
+            chosen_comp = int(math.ceil(self.X * len(self.c_pop)))
             best_c = self.c_pop[:chosen_comp]
             # The number of members chosen from NC
             chosen_ncomp = (200.0 / self.A) / 100.0
@@ -202,7 +202,7 @@ class ESOptimizer(object):
         The method accepts 2 indexes of the NC competitives and 
         race their members configurations and send the winner to
         the attractive pile and the loser to the unattractive one.
-        """ 
+        """
         start_time = time.time()
         first_conf = self.nc_pop[idx1].config
         second_conf = self.nc_pop[idx2].config
