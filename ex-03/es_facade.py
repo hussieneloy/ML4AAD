@@ -1,6 +1,7 @@
 import typing
 import numpy as np
 import logging
+import os
 
 from smac.tae.execute_ta_run import ExecuteTARun
 from smac.tae.execute_ta_run_old import ExecuteTARunOld
@@ -55,7 +56,7 @@ class ES(object):
         # inject aggr_func if necessary
         if runhistory.aggregate_func is None:
             runhistory.aggregate_func = aggregate_func
-        
+
         # initial random number generator
         num_run, rng = self._get_rng(rng=rng)
 
@@ -125,8 +126,6 @@ class ES(object):
         if intensifier.traj_logger is None:
             intensifier.traj_logger = traj_logger
 
-        # TODO: look into initial design/configuration, random or default
-        # TODO: runhistory2epm for extension (ex2)
 
         es_args = {
             'scenario': scenario,
@@ -151,7 +150,21 @@ class ES(object):
         self.solver = ESOptimizer(**es_args)
 
     def optimize(self):
-        self.solver.run()
+        incumbent = None
+        try:
+            incumbent = self.solver.run()
+        finally:
+            self.solver.stats.save()
+            self.solver.stats.print_stats()
+            self._logger.info("Final Incumbent: %s" % (self.solver.incumbent))
+            self.runhistory = self.solver.runhistory
+            self.trajectory = self.solver.intensifier.traj_logger.trajectory
+
+            if self.output_dir is not None:
+                self.solver.runhistory.save_json(
+                    fn=os.path.join(self.output_dir, "runhistory.json")
+                )
+        return incumbent
 
     def validate(self):
         pass

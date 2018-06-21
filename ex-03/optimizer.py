@@ -7,6 +7,7 @@ import logging
 
 import ConfigSpace
 import math
+from collections import Counter
 from smac.configspace import Configuration
 from smac.intensification.intensification import Intensifier
 from smac.runhistory.runhistory import RunHistory
@@ -14,7 +15,7 @@ from smac.scenario.scenario import Scenario
 from smac.stats.stats import Stats
 from smac.utils.io.traj_logging import TrajLogger
 from ConfigSpace.util import get_random_neighbor
-from ConfigSpace.hyperparameters import Hyperparameter, CategoricalHyperparameter
+from ConfigSpace.hyperparameters import Hyperparameter, CategoricalHyperparameter, IntegerHyperparameter
 from ConfigSpace.hyperparameters import FloatHyperparameter, UniformIntegerHyperparameter, Constant
 from PopMember import PopMember
 
@@ -51,7 +52,7 @@ class ESOptimizer(object):
         self.c_pop = []
         self.attractive = []
         self.unattractive = []
-        self.X = X 
+        self.X = X
         self.M = M
         self.A = A
         self.initialPop = initialPop
@@ -96,6 +97,8 @@ class ESOptimizer(object):
 
         generation = 0
 
+        self.nc_pop = list(set(self.nc_pop))
+
         while not self.stats.is_budget_exhausted():
 
             generation += 1
@@ -108,11 +111,11 @@ class ESOptimizer(object):
             # The main loop is broken when budget is exhausted.
             self.incumbent = self.c_pop[0].config
             # Best X % in C
-            chosen_comp = int(math.ceil(self.X * len(self.c_pop)))
+            chosen_comp = int(math.ceil((self.X * len(self.c_pop)) / 100.0))
             self._logger.info("%s members of competitive Population chosen for mating" % (chosen_comp))
             best_c = self.c_pop[:chosen_comp]
             # The number of members chosen from NC
-            chosen_ncomp = (200.0 / self.A) / 100.0
+            chosen_ncomp = (100.0 / self.A) / 100.0
             chosen_ncomp *= len(self.nc_pop)
             chosen_ncomp = int(math.ceil(chosen_ncomp))
             self._logger.info("%s members of non-competitive Population chosen for mating" % (chosen_ncomp))
@@ -128,7 +131,6 @@ class ESOptimizer(object):
                 c.increase_age()
             for nc in self.nc_pop:
                 nc.increase_age()
-
             # The incumbent is first configuration in C
             self.incumbent = self.c_pop[0].config
             # Killing old members
@@ -149,6 +151,7 @@ class ESOptimizer(object):
         The function mates each competitive member with a random
         percentage of th uncompetitive members
         """
+
         for c in best_c:
             # Mate each one of C with random multiple ones from NC
             start_time = time.time()
@@ -259,7 +262,11 @@ class ESOptimizer(object):
         while lo < hi:
             mid = int((lo + hi) / 2)
             list_conf = self.c_pop[mid].config
-
+            # Check if the new configuration is already there.
+            if list_conf == configuration:
+                return
+            # print(list_conf)
+            # print(configuration)
             winner = self.race_configs([list_conf, configuration], time_left)
 
             if winner == configuration:
@@ -343,10 +350,7 @@ class ESOptimizer(object):
             val = np.random.random_integers(a, b)
             return param.name, val
         elif isinstance(param, CategoricalHyperparameter):
-            idx = np.random.random_integers(0, param._num_choices)
-            choices_list = list(choices)
-            val = choices_list[idx]
-            return param.name, val
+            return param.name, random.choice(list(param.choices))
         else:
             idx = np.random.random_integers(0, param._num_choices)
             choices_list = list(sequence)
@@ -402,7 +406,7 @@ class ESOptimizer(object):
             new_conf = self.mutate(new_conf)
 
             # create new child, randomly set gender
-            g = np.random.randint(0, 1000)
+            g = np.random.randint(0, 100)
             if g % 2 == 0:
                 child = PopMember(new_conf, 0, 0)
                 self.insert_c(child, time_left)
@@ -411,11 +415,15 @@ class ESOptimizer(object):
                 self.nc_pop.append(child)
         self._logger.info("Mated one member of competitive population with %s members of non-competitive population." % (len(nc_list)))
 
+        self.nc_pop = list(set(self.nc_pop))
+
+
     def race_configs(self, set_of_conf, time_left):
         """Races the challengers agains each other to determine incumbent
 
         """
         # print("Time left: %s" % (max(self.intensifier._min_time, time_left)))
+
         try:
             best, inc_perf = self.intensifier.intensify(
                 challengers=[set_of_conf[1]],

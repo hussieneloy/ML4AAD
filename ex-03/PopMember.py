@@ -15,3 +15,11 @@ class PopMember(object):
         """ Function to increase age
         """
         self.age += 1
+
+    def __eq__(self, other):
+        return self.config == other.config
+
+
+    def __hash__(self):
+        return hash(self.config)
+        
