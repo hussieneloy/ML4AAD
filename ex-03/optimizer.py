@@ -3,6 +3,7 @@ import threading
 import time
 import math
 import random
+import logging
 
 import ConfigSpace
 import math
@@ -38,6 +39,7 @@ class ESOptimizer(object):
                  initialPop: int=20,
                  extension: bool=False):
 
+        self._logger = logging.getLogger(self.__module__ + "." + self.__class__.__name__)
         self.incumbent = scenario.cs.get_default_configuration()
         self.scenario = scenario
         self.stats = stats
@@ -59,14 +61,19 @@ class ESOptimizer(object):
 
     def start(self):
         self.stats.start_timing()
+        self._logger.info("Start time: %s" % (self.stats._start_time))
 
     def run(self):
         self.start()
 
+        self._logger.info("*"*60)
+        self._logger.info("Initializing Populations.")
+        self._logger.info("*"*60)
         # Give a chance for the default confiugration
         default_conf = self.scenario.cs.get_default_configuration()
         first_pop = PopMember(default_conf, np.random.randint(self.A) + 1, 0)
         self.c_pop.append(first_pop)
+        self._logger.info("First Population Member: %s" % (default_conf))
 
         # Initializing further 19 elements to be the initial population.
         for i in range(self.initialPop - 1):
@@ -80,18 +87,35 @@ class ESOptimizer(object):
                 self.insert_c(pop_mem, time_left)
             else:
                 self.nc_pop.append(pop_mem)
+                self._logger.info("New member added to Non-competitive Population")
+                self._logger.info("New Size of NC Population: %s" % (len(self.nc_pop)))
+
+        self._logger.info("*"*60)
+        self._logger.info("Done with Initializing.")
+        self._logger.info("*"*60)
+
+        generation = 0
 
         while not self.stats.is_budget_exhausted():
 
+            generation += 1
+            self._logger.info("*"*60)
+            self._logger.info("Generation # %s" % (generation))
+            self._logger.info("*"*60)
+
+            time_budget_left = self.scenario.wallclock_limit - (time.time() - self.stats._start_time)
+            self._logger.info("Time budget left: %f" % (time_budget_left))
             # The main loop is broken when budget is exhausted.
             self.incumbent = self.c_pop[0].config
             # Best X % in C
             chosen_comp = int(math.ceil(self.X * len(self.c_pop)))
+            self._logger.info("%s members of competitive Population chosen for mating" % (chosen_comp))
             best_c = self.c_pop[:chosen_comp]
             # The number of members chosen from NC
             chosen_ncomp = (200.0 / self.A) / 100.0
             chosen_ncomp *= len(self.nc_pop)
             chosen_ncomp = int(math.ceil(chosen_ncomp))
+            self._logger.info("%s members of non-competitive Population chosen for mating" % (chosen_ncomp))
 
             # Checking if the extension applies
             if self.extension:
@@ -109,6 +133,9 @@ class ESOptimizer(object):
             self.incumbent = self.c_pop[0].config
             # Killing old members
             self.kill_old()
+
+        self._logger.info("*"*60)
+        self._logger.info("*"*60)
 
         self.incumbent = self.c_pop[0].config
         print("Incumbent is :")
@@ -132,8 +159,8 @@ class ESOptimizer(object):
 
     def selected_mating(self, best_c, chosen_ncomp):
         """
-        The function mates each competitive member with a 
-        percentage of th uncompetitive members based on how 
+        The function mates each competitive member with a
+        percentage of th uncompetitive members based on how
         fit the uncompetive heurstically.
         """
         for c in best_c:
@@ -232,12 +259,9 @@ class ESOptimizer(object):
         while lo < hi:
             mid = int((lo + hi) / 2)
             list_conf = self.c_pop[mid].config
-            
-            #print(list_conf)
-            #print(configuration)
+
             winner = self.race_configs([list_conf, configuration], time_left)
-            #print('=')
-            #print(winner)
+
             if winner == configuration:
                 hi = mid - 1
             else:
@@ -246,17 +270,16 @@ class ESOptimizer(object):
             self.c_pop.append(member)
         else:
             list_conf = self.c_pop[lo].config
-            #print(list_conf)
-            #print(configuration)
+
             winner = self.race_configs([list_conf, configuration], time_left)
-            #print('=')
-            #print(winner)
+
             if winner == configuration:
                 self.c_pop.insert(lo, member)
             else:
                 self.c_pop.insert(lo + 1, member)
-            #print('-')
-            #print('-')
+        self._logger.info("New member added to competitive population")
+        self._logger.info("New Size of C Population: %s" % (len(self.c_pop)))
+
         """
         for c in self.c_pop:
            print(c.config,end=',')
@@ -277,6 +300,9 @@ class ESOptimizer(object):
         c_pop_cpy.insert(0, first_c)
         self.c_pop = c_pop_cpy
         self.nc_pop = [pop for pop in self.nc_pop if self.is_young(pop)]
+        self._logger.info("Killed old members")
+        self._logger.info("New Size of NC Population: %s" % (len(self.nc_pop)))
+        self._logger.info("New Size of C Population: %s" % (len(self.c_pop)))
 
     def generate_random_configuration(self):
         """
@@ -369,7 +395,7 @@ class ESOptimizer(object):
 
         for nc in nc_list:
             
-            # cross both partner, get new config
+            # cross both partner with probability of 50%, get new config
             new_conf = self.cross(c.config, nc.config, 50)
 
             # mutate configuration
@@ -383,6 +409,7 @@ class ESOptimizer(object):
             else:
                 child = PopMember(new_conf, 0, 1)
                 self.nc_pop.append(child)
+        self._logger.info("Mated one member of competitive population with %s members of non-competitive population." % (len(nc_list)))
 
     def race_configs(self, set_of_conf, time_left):
         """Races the challengers agains each other to determine incumbent

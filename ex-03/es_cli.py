@@ -11,7 +11,7 @@ from smac.runhistory.runhistory import RunHistory
 from smac.stats.stats import Stats
 # from smac.optimizer.objective import average_cost
 # from smac.utils.merge_foreign_data import merge_foreign_data_from_file
-# from smac.utils.io.traj_logging import TrajLogger
+from smac.utils.io.traj_logging import TrajLogger
 # from smac.utils.io.input_reader import InputReader
 from smac.tae.execute_ta_run import TAEAbortException, FirstRunCrashedException
 # from smac.utils.io.output_directory import create_output_directory
@@ -65,6 +65,7 @@ class ESCLI(object):
         )
 
         try:
+            self.logger.info("Started Optimization")
             optimizer.optimize()
         except (TAEAbortException, FirstRunCrashedException) as err:
             self.logger.error(err)

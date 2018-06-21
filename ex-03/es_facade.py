@@ -1,5 +1,6 @@
 import typing
 import numpy as np
+import logging
 
 from smac.tae.execute_ta_run import ExecuteTARun
 from smac.tae.execute_ta_run_old import ExecuteTARunOld
@@ -35,7 +36,8 @@ class ES(object):
                  A: int=3,
                  initialPop: int=20,
                  extension: bool=False):
-        
+
+        self._logger = logging.getLogger(self.__module__ + "." + self.__class__.__name__)
         aggregate_func = average_cost
 
         self.output_dir = create_output_directory(scenario, run_id)
