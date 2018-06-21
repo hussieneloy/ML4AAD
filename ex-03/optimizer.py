@@ -6,6 +6,7 @@ import random
 
 import ConfigSpace
 import math
+from collections import Counter
 from smac.configspace import Configuration
 from smac.intensification.intensification import Intensifier
 from smac.runhistory.runhistory import RunHistory
@@ -62,7 +63,6 @@ class ESOptimizer(object):
 
     def run(self):
         self.start()
-
         # Give a chance for the default confiugration
         default_conf = self.scenario.cs.get_default_configuration()
         first_pop = PopMember(default_conf, np.random.randint(self.A) + 1, 0)
@@ -81,18 +81,19 @@ class ESOptimizer(object):
             else:
                 self.nc_pop.append(pop_mem)
 
+        self.nc_pop = list(set(self.nc_pop))
+       
         while not self.stats.is_budget_exhausted():
 
             # The main loop is broken when budget is exhausted.
             self.incumbent = self.c_pop[0].config
             # Best X % in C
-            chosen_comp = int(math.ceil(self.X * len(self.c_pop)))
+            chosen_comp = int(math.ceil((self.X * len(self.c_pop)) / 100.0))
             best_c = self.c_pop[:chosen_comp]
             # The number of members chosen from NC
             chosen_ncomp = (200.0 / self.A) / 100.0
             chosen_ncomp *= len(self.nc_pop)
             chosen_ncomp = int(math.ceil(chosen_ncomp))
-
             # Checking if the extension applies
             if self.extension:
                 self.selected_mating(best_c, chosen_ncomp)
@@ -104,7 +105,6 @@ class ESOptimizer(object):
                 c.increase_age()
             for nc in self.nc_pop:
                 nc.increase_age()
-
             # The incumbent is first configuration in C
             self.incumbent = self.c_pop[0].config
             # Killing old members
@@ -122,6 +122,7 @@ class ESOptimizer(object):
         The function mates each competitive member with a random
         percentage of th uncompetitive members
         """
+
         for c in best_c:
             # Mate each one of C with random multiple ones from NC
             start_time = time.time()
@@ -232,7 +233,9 @@ class ESOptimizer(object):
         while lo < hi:
             mid = int((lo + hi) / 2)
             list_conf = self.c_pop[mid].config
-            
+            # Check if the new configuration is already there.
+            if list_conf == configuration:
+                return
             #print(list_conf)
             #print(configuration)
             winner = self.race_configs([list_conf, configuration], time_left)
@@ -277,6 +280,7 @@ class ESOptimizer(object):
         c_pop_cpy.insert(0, first_c)
         self.c_pop = c_pop_cpy
         self.nc_pop = [pop for pop in self.nc_pop if self.is_young(pop)]
+
 
     def generate_random_configuration(self):
         """
@@ -384,11 +388,15 @@ class ESOptimizer(object):
                 child = PopMember(new_conf, 0, 1)
                 self.nc_pop.append(child)
 
+        self.nc_pop = list(set(self.nc_pop))
+
+
     def race_configs(self, set_of_conf, time_left):
         """Races the challengers agains each other to determine incumbent
 
         """
         # print("Time left: %s" % (max(self.intensifier._min_time, time_left)))
+
         try:
             best, inc_perf = self.intensifier.intensify(
                 challengers=[set_of_conf[1]],
