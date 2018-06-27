@@ -1,0 +1,12 @@
+algo = python ./gurobiWrapper.py --runsolver-path /home/wagnerf/ex-3/optomip/wrapper/runsolver/runsolver-3.3.4/src/runsolver --mem-limit 2048
+paramfile = ./gurobi-params.pcs
+execdir = . 
+deterministic = 1
+run_obj = runtime
+overall_obj = par10
+cutoff_time = 10
+wallclock_limit = 60
+instance_file = /data/aad/aclib2/instances/mip/sets/BCOL-CLS/training.txt
+test_instance_file = /data/aad/aclib2/instances/mip/sets/BCOL-CLS/test.txt
+feature_file = ./state/gurobi_features.txt
+output_dir = es-output
