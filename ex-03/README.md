@@ -1,5 +1,7 @@
 # README for our ES optimizer
 
+A brief explanation of our approach can be found in the ML4AAd.pdf file.
+
 ## Setting up requirements
 Our tool doesn't require any other packages than what is already needed for ACLIB or SMAC3. For running our tool out of ACLIB you need to install
 
