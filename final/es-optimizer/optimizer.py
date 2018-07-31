@@ -4,6 +4,9 @@ import time
 import math
 import random
 import logging
+import copy
+from sklearn import linear_model, preprocessing
+
 
 import ConfigSpace
 import math
@@ -11,16 +14,26 @@ from collections import Counter
 from smac.configspace import Configuration
 from smac.intensification.intensification import Intensifier
 from smac.runhistory.runhistory import RunHistory
+from smac.utils.util_funcs import get_types
+from smac.utils.constants import MAXINT
+from smac.tae.execute_ta_run import StatusType
 from smac.scenario.scenario import Scenario
+from smac.configspace import convert_configurations_to_array
 from smac.stats.stats import Stats
+from smac.optimizer.acquisition import AbstractAcquisitionFunction, LogEI, EI
+from smac.optimizer.ei_optimization import InterleavedLocalAndRandomSearch, \
+    AcquisitionFunctionMaximizer, RandomSearch
+from smac.epm.rf_with_instances import RandomForestWithInstances
+from smac.optimizer.objective import _cost
 from smac.utils.io.traj_logging import TrajLogger
+from smac.runhistory.runhistory2epm import AbstractRunHistory2EPM
 from ConfigSpace.util import get_random_neighbor
 from ConfigSpace.hyperparameters import Hyperparameter, CategoricalHyperparameter, IntegerHyperparameter
 from ConfigSpace.hyperparameters import FloatHyperparameter, UniformIntegerHyperparameter, Constant
 
 
 class ESOptimizer(object):
-    """Interface that contains the main Evolutionary optimizer
+    """Interface that contains the parallel optimizer
 
     Attributes:
 
@@ -30,8 +43,12 @@ class ESOptimizer(object):
                  scenario: Scenario,
                  stats: Stats,
                  runhistory: RunHistory,
+                 runhistory2epm: AbstractRunHistory2EPM,
                  intensifier: Intensifier,
                  aggregate_func: callable,
+                 model: RandomForestWithInstances,
+                 acq_optimizer: AcquisitionFunctionMaximizer,
+                 acquisition_func: AbstractAcquisitionFunction,
                  rng: np.random.RandomState,
                  parallel_options: str):
 
@@ -39,8 +56,12 @@ class ESOptimizer(object):
         self.incumbent = scenario.cs.get_default_configuration()
         self.scenario = scenario
         self.stats = stats
+        self.rh2EPM = runhistory2epm
         self.runhistory = runhistory
         self.intensifier = intensifier
+        self.model = model
+        self.acq_optimizer = acq_optimizer
+        self.acquisition_func = acquisition_func
         self.aggregate_func = aggregate_func
         self.rng = rng
         self.parallel_options = parallel_options
@@ -55,14 +76,19 @@ class ESOptimizer(object):
         # Give a chance for the default confiugration
         # default config is set as starting incumbent
         self._logger.info("Default Configuration: %s" % (self.incumbent))
-
+        # Add 5 random configuration at first
+        challengers = self.scenario.cs.sample_configuration(size=5)
+        # Add a run for the incumbent configuration to be used in optimization.
+        self.intensifier._add_inc_run(incumbent=self.incumbent, run_history=self.runhistory)
         while True:
 
             start_time = time.time()
 
             # Find configurations to evaluate next
             self._logger.info("Searching for next configuration")
-            challengers = self.choose_next()
+            challenger = self.choose_next(challengers)
+            
+            challengers.append(challenger)
 
             time_spent = time.time() - start_time
             self._logger.info("Time spent for choosing configuration: %s" % (time_spent))
@@ -72,7 +98,6 @@ class ESOptimizer(object):
             self._logger.info("Time left for intensification: %s" % (time_left))
             self._logger.info("Intensifying...")
             self.incumbent, inc_perf = self.race_configs(challengers, self.incumbent, time_left)
-
             logging.debug("Remaining budget: %f (wallclock), %f (ta costs), %f (target runs)" % (
                 self.stats.get_remaing_time_budget(),
                 self.stats.get_remaining_ta_budget(),
@@ -85,16 +110,16 @@ class ESOptimizer(object):
 
         return self.incumbent
 
-    def choose_next(self):
+    def choose_next(self, configs):
         # Constant Liar
         if "CL+" in self.parallel_options:
-            pass
+            return self.cl(configs)
         # UBC
         elif "UBC+" in self.parallel_options:
             pass
-        # Expectation acroo fantasies
+        # Expectations across fantasies
         elif "FA+" in self.parallel_options:
-            pass
+            return self.expect_fan(configs)
         # Thompson Sampling
         elif "TS+" in self.parallel_options:
             pass
@@ -156,6 +181,122 @@ class ESOptimizer(object):
         total_time = time_spent / (1 - frac_intensify)
         time_left = frac_intensify * total_time
         return time_left
+
+    def cl(self, configs):
+        # Get all instances available
+        instances = self.intensifier.instances
+        # A copy from the runhistory in order not to ruin the original with lies
+        tmp_runhistory = copy.deepcopy(self.runhistory)
+      
+        for config in configs:
+            # Get runs of the current configuration
+            conf_runs = self.runhistory.get_runs_for_config(config)
+            conf_runs = [x[0] for x in conf_runs]
+            # Get the available runs for the current configuration
+            available_insts = instances - set(conf_runs)
+            # Choose random instance
+            random_idx = np.random.randint(0, len(available_insts))
+            random_inst = list(available_insts)[random_idx]
+            # Getting the cost of the configuration runs
+            conf_costs = _cost(config, self.runhistory) 
+            # Get the CL-min, the minimum variation of Constant-liar
+            lie = np.amin(conf_costs) if (len(conf_costs) > 0) else 0
+
+            # Add hallucination to the fake runhistory
+            tmp_runhistory.add(config=config, cost=lie, 
+            time=0.0, status=StatusType.SUCCESS, instance_id=random_inst)
+        
+        # Training the EPM with the temporary runhistory
+        X, Y = self.rh2EPM.transform(tmp_runhistory)
+        self.model.train(X, Y)
+        incumbent_value = self.runhistory.get_cost(self.incumbent)
+        # Updating the acqusition function and invoking the maximizer
+        self.acquisition_func.update(model=self.model, eta=incumbent_value)
+        new_challengers = self.acq_optimizer.maximize(tmp_runhistory, self.stats, 50)
+
+        # Picking the best candidate
+        answer = new_challengers.challengers[0]
+        return answer
+
+    def expect_fan(self, configs):
+        # Filling The aggregate acquisition values with zeros
+        sum_acq = np.zeros(10)
+        for config in configs:
+            # Getting the cost of the configuration runs
+            conf_costs = _cost(config, self.runhistory)
+            if len(conf_costs) == 0:
+                continue
+
+            x, y = [], []
+            for (xi, yi) in enumerate(conf_costs):
+                x.append([xi])
+                y.append(yi)
+            x = np.array(x)
+            y = np.array(y)
+
+            # Predicting the next 10 values using linear regression
+            regr = linear_model.LinearRegression()
+            regr.fit(x, y)
+            x_test = [[i] for i in range(len(x), 10 + len(x))]
+            x_test = np.ndarray.flatten(np.array(x_test))
+            x_test = [float(i) for i in x_test]
+            x_test = np.array([[x] for x in x_test])
+            posterior = regr.predict(x_test)
+
+            types, bounds = np.array([0]), np.array([[0.0, 1.0]])
+            posterior = np.array([[y] for y in posterior])
+            # Fitting the EPM with the posterior values
+            epm_model = RandomForestWithInstances(types=types, bounds=bounds,
+                                              instance_features=None,
+                                              seed=12345,pca_components=12345,
+                                              ratio_features=1,
+                                              num_trees=1000,
+                                              min_samples_split=1,
+                                              min_samples_leaf=1,
+                                              max_depth=100000,
+                                              do_bootstrapping=False,
+                                              n_points_per_tree=-1,
+                                              eps_purity=0)
+            
+            # Training Acquistion function with the new model
+            post_acq = EI(model=epm_model)
+            epm_model.train(x_test, posterior) 
+            incumbent_value = np.amin(posterior)
+            post_acq.update(model=epm_model, eta=incumbent_value)
+            # Adding the acquisition values to the aggregate function
+            acq_values = post_acq._compute(X=x_test)[:,0]
+            sum_acq = [a + b for a, b in zip(sum_acq, acq_values)]
+
+        # Constructing the Final EPM which trains the aggregate function
+        types, bounds = np.array([0]), np.array([[0.0, 1.0]])
+        sum_model = RandomForestWithInstances(types=types, bounds=bounds,
+                                              instance_features=None,
+                                              seed=12345,pca_components=12345,
+                                              ratio_features=1,
+                                              num_trees=1000,
+                                              min_samples_split=1,
+                                              min_samples_leaf=1,
+                                              max_depth=100000,
+                                              do_bootstrapping=False,
+                                              n_points_per_tree=-1,
+                
+                                              eps_purity=0)
+        x_axis = np.arange(10)
+        x_axis = np.array([[float(x)] for x in x_axis])
+        sum_acq = np.array([[y] for y in sum_acq])
+        sum_model.train(x_axis, sum_acq)
+        incumbent_value = self.runhistory.get_cost(self.incumbent)
+        
+        # Updating the acquistion function with aggregate epm model
+        self.acquisition_func.update(model=sum_model, eta=incumbent_value)
+
+        new_challengers = self.acq_optimizer.maximize(self.runhistory, self.stats, 50)
+
+        # Picking the best performing configuration
+        answer = new_challengers.challengers[0]
+        
+        return answer
+
 
     """def generate_random_configuration(self):
 

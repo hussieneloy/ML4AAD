@@ -8,13 +8,23 @@ from smac.tae.execute_ta_run import ExecuteTARun
 from smac.tae.execute_ta_run_old import ExecuteTARunOld
 from smac.tae.execute_func import ExecuteTAFuncDict
 from smac.stats.stats import Stats
+from smac.tae.execute_ta_run import StatusType
+from smac.utils.util_funcs import get_types
 from smac.scenario.scenario import Scenario
 from smac.runhistory.runhistory import RunHistory
+from smac.runhistory.runhistory2epm import AbstractRunHistory2EPM, \
+    RunHistory2EPM4LogCost, RunHistory2EPM4Cost
 from smac.intensification.intensification import Intensifier
 from smac.utils.io.traj_logging import TrajLogger
 from smac.configspace import Configuration
 from smac.optimizer.objective import average_cost
+from smac.epm.base_epm import AbstractEPM
 from smac.utils.constants import MAXINT
+from smac.optimizer.acquisition import EI, LogEI, AbstractAcquisitionFunction
+from smac.optimizer.ei_optimization import InterleavedLocalAndRandomSearch, \
+    AcquisitionFunctionMaximizer
+from smac.epm.rf_with_instances import RandomForestWithInstances
+
 from smac.utils.io.output_directory import create_output_directory
 
 from optimizer import ESOptimizer
@@ -31,6 +41,10 @@ class ES(object):
                  stats: Stats=None,
                  runhistory: RunHistory=None,
                  intensifier: Intensifier=None,
+                 acquisition_function: AbstractAcquisitionFunction=None,
+                 acquisition_function_optimizer: AcquisitionFunctionMaximizer=None,
+                 model: AbstractEPM=None,
+                 runhistory2epm: AbstractRunHistory2EPM=None,
                  rng: typing.Union[np.random.RandomState, int]=None,
                  run_id: int=1,
                  parallel_options: str=None):
@@ -126,19 +140,92 @@ class ES(object):
         if parallel_options is None:
             parallel_options = "CL+LIST"
 
+        # initial conversion of runhistory into EPM data
+        if runhistory2epm is None:
+
+            num_params = len(scenario.cs.get_hyperparameters())
+            if scenario.run_obj == "runtime":
+
+                # if we log the performance data,
+                # the RFRImputator will already get
+                # log transform data from the runhistory
+                cutoff = np.log10(scenario.cutoff)
+                threshold = np.log10(scenario.cutoff *
+                                     scenario.par_factor)
+
+                imputor = RFRImputator(rng=rng,
+                                       cutoff=cutoff,
+                                       threshold=threshold,
+                                       model=model,
+                                       change_threshold=0.01,
+                                       max_iter=2)
+
+                runhistory2epm = RunHistory2EPM4LogCost(
+                    scenario=scenario, num_params=num_params,
+                    success_states=[StatusType.SUCCESS, ],
+                    impute_censored_data=True,
+                    impute_state=[StatusType.CAPPED, ],
+                    imputor=imputor)
+
+            elif scenario.run_obj == 'quality':
+                runhistory2epm = RunHistory2EPM4Cost(scenario=scenario, num_params=num_params,
+                                                     success_states=[
+                                                         StatusType.SUCCESS, 
+                                                         StatusType.CRASHED],
+                                                     impute_censored_data=False, impute_state=None)
+
+            else:
+                raise ValueError('Unknown run objective: %s. Should be either '
+                                 'quality or runtime.' % self.scenario.run_obj)
+
+        # inject scenario if necessary:
+        if runhistory2epm.scenario is None:
+            runhistory2epm.scenario = scenario
+
+        # initial EPM
+        types, bounds = get_types(scenario.cs, scenario.feature_array)
+        if model is None:
+            model = RandomForestWithInstances(types=types, bounds=bounds,
+                                              instance_features=scenario.feature_array,
+                                              seed=rng.randint(MAXINT),
+                                              pca_components=scenario.PCA_DIM)
+        # initial acquisition function
+        if acquisition_function is None:
+            if scenario.run_obj == "runtime":
+                acquisition_function = LogEI(model=model)
+            else:
+                acquisition_function = EI(model=model)
+        # inject model if necessary
+        if acquisition_function.model is None:
+            acquisition_function.model = model
+
+        # initialize optimizer on acquisition function
+        if acquisition_function_optimizer is None:
+            acquisition_function_optimizer = InterleavedLocalAndRandomSearch(
+                acquisition_function, scenario.cs, np.random.RandomState(seed=rng.randint(MAXINT))
+            )
+        elif not isinstance(
+                acquisition_function_optimizer,
+                AcquisitionFunctionMaximizer,
+            ):
+            raise ValueError(
+                "Argument 'acquisition_function_optimizer' must be of type"
+                "'AcquisitionFunctionMaximizer', but is '%s'" %
+                type(acquisition_function_optimizer)
+            )
 
         es_args = {
             'scenario': scenario,
             'stats': self.stats,
             # 'initial_design': initial_design,
             'runhistory': runhistory,
-            # 'runhistory2epm': runhistory2epm,
+            'runhistory2epm': runhistory2epm,
             'intensifier': intensifier,
             'aggregate_func': aggregate_func,
             # 'num_run': num_run,
-            # 'model': model,
-            # 'acq_optimizer': acquisition_function_optimizer,
-            # 'acquisition_func': acquisition_function,
+            'model': model,
+            'acq_optimizer': acquisition_function_optimizer,
+            'acquisition_func': acquisition_function,
             'rng': rng,
             'parallel_options': parallel_options
         }
