@@ -11,6 +11,7 @@ from sklearn import linear_model, preprocessing
 import ConfigSpace
 import math
 from collections import Counter
+from smac.tae.execute_ta_run_old import ExecuteTARunOld
 from smac.configspace import Configuration
 from smac.intensification.intensification import Intensifier
 from smac.runhistory.runhistory import RunHistory
@@ -22,7 +23,7 @@ from smac.configspace import convert_configurations_to_array
 from smac.stats.stats import Stats
 from smac.optimizer.acquisition import AbstractAcquisitionFunction, LogEI, EI
 from smac.optimizer.ei_optimization import InterleavedLocalAndRandomSearch, \
-    AcquisitionFunctionMaximizer, RandomSearch
+    AcquisitionFunctionMaximizer, RandomSearch, LocalSearch
 from smac.epm.rf_with_instances import RandomForestWithInstances
 from smac.optimizer.objective import _cost
 from smac.utils.io.traj_logging import TrajLogger
@@ -73,6 +74,7 @@ class ESOptimizer(object):
     def run(self):
         self.start()
 
+
         # Give a chance for the default confiugration
         # default config is set as starting incumbent
         self._logger.info("Default Configuration: %s" % (self.incumbent))
@@ -87,8 +89,8 @@ class ESOptimizer(object):
             # Find configurations to evaluate next
             self._logger.info("Searching for next configuration")
             challenger = self.choose_next(challengers)
-            
             challengers.append(challenger)
+
 
             time_spent = time.time() - start_time
             self._logger.info("Time spent for choosing configuration: %s" % (time_spent))
@@ -116,7 +118,7 @@ class ESOptimizer(object):
             return self.cl(configs)
         # UBC
         elif "UBC+" in self.parallel_options:
-            pass
+            return self.ucb(configs)
         # Expectations across fantasies
         elif "FA+" in self.parallel_options:
             return self.expect_fan(configs)
@@ -297,6 +299,92 @@ class ESOptimizer(object):
         
         return answer
 
+    def ucb(self, configs):
+        new_configs = []
+        # This loop should be replaced with parallel workers
+        for config in configs:
+            new_config, new_cost = self.single_ucb(config)
+            new_configs.append((new_config, new_cost))
+        best = min(new_configs, key= lambda t:t[1])
+        return best[0]
+
+
+    def single_ucb(self, config):
+        conf_costs = _cost(config, self.runhistory)
+        config_runs = len(conf_costs)
+        if config_runs == 0:
+            random_config = self.scenario.cs.sample_configuration()
+            return random_config, 0.0
+        computed_instances = self.runhistory.get_runs_for_config(config)
+        answer = config
+        current_config = config
+        answer_cost = self.ucb_func(conf_costs, 0.0)
+        tae_runner = ExecuteTARunOld(ta=self.scenario.ta,
+                                         stats=self.stats,
+                                         run_obj=self.scenario.run_obj,
+                                         runhistory=self.runhistory,
+                                         par_factor=self.scenario.par_factor,
+                                         cost_for_crash=self.scenario.cost_for_crash)
+        beta_t = 0.1
+        types, bounds = np.array([0]), np.array([[0.0, 1.0]])
+        local_model = RandomForestWithInstances(types=types, bounds=bounds,
+                                              instance_features=None,
+                                              seed=12345,pca_components=12345,
+                                              ratio_features=1,
+                                              num_trees=1000,
+                                              min_samples_split=1,
+                                              min_samples_leaf=1,
+                                              max_depth=100000,
+                                              do_bootstrapping=False,
+                                              n_points_per_tree=-1,
+                                              eps_purity=0)
+        local_acq = EI(model=local_model)
+        local_optimizer = LocalSearch(local_acq, self.scenario.cs, 
+            np.random.RandomState(seed=self.rng.randint(MAXINT)))
+        for iterations in range(10):
+            x_axis = np.arange(config_runs)
+            x_axis = np.array([[float(x)] for x in x_axis])
+            costs = np.array([[y] for y in conf_costs])
+            local_model.train(x_axis, costs)
+            min_so_far = np.amin(conf_costs)
+            local_acq.update(model=local_model, eta=min_so_far)
+            possible_neighbors = local_optimizer.maximize(self.runhistory, self.stats, 10)
+            best_neighbor = possible_neighbors[0]
+            
+            current_config = best_neighbor
+            neighbor_costs = []
+            # This loop could be parallelized
+            for inst in computed_instances:
+
+                seed = 0
+                inst = inst.instance
+                if self.scenario.deterministic == 0:
+                    seed = self.rng.randint(low=0, high=MAXINT, size=1)[0]
+                try:
+                    status, cost, dur, res = tae_runner.start(
+                    config=best_neighbor,
+                    instance=inst,
+                    seed=seed,
+                    cutoff=self.scenario.cutoff,
+                    instance_specific=self.scenario.instance_specific.get(
+                        inst, "0"))
+                except:
+                    break
+                neighbor_costs.append(cost)
+                
+            neighbor_value = self.ucb_func(neighbor_costs, beta_t)
+            if neighbor_value <= answer_cost:
+                answer = current_config
+                answer_cost = neighbor_value
+            beta_t += 0.1
+            conf_costs = neighbor_costs
+        return answer, answer_cost
+
+
+    def ucb_func(self, values, beta):
+        miu = np.mean(values)
+        sigma = np.std(values)
+        return miu + beta * sigma
 
     """def generate_random_configuration(self):
 
