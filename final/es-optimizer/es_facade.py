@@ -100,20 +100,24 @@ class ES(object):
             tae_runner.crash_cost = scenario.cost_for_crash
 
         # initialize intensification
+
+        def intensifier_maker(instants):
+            return Intensifier(tae_runner=tae_runner,
+                               stats=self.stats,
+                               traj_logger=traj_logger,
+                               rng=rng,
+                               instances=instants,
+                               cutoff=scenario.cutoff,
+                               deterministic=scenario.deterministic,
+                               run_obj_time=scenario.run_obj == "runtime",
+                               always_race_against=scenario.cs.get_default_configuration() \
+                                   if scenario.always_race_default else None,
+                               instance_specifics=scenario.instance_specific,
+                               minR=scenario.minR,
+                               maxR=scenario.maxR)
+
         if intensifier is None:
-            intensifier = Intensifier(tae_runner=tae_runner,
-                                      stats=self.stats,
-                                      traj_logger=traj_logger,
-                                      rng=rng,
-                                      instances=scenario.train_insts,
-                                      cutoff=scenario.cutoff,
-                                      deterministic=scenario.deterministic,
-                                      run_obj_time=scenario.run_obj == "runtime",
-                                      always_race_against=scenario.cs.get_default_configuration() \
-                                        if scenario.always_race_default else None,
-                                      instance_specifics=scenario.instance_specific,
-                                      minR=scenario.minR,
-                                      maxR=scenario.maxR)
+            intensifier = intensifier_maker(scenario.train_insts)
 
         # inject deps if necessary
         if intensifier.tae_runner is None:
@@ -125,7 +129,6 @@ class ES(object):
         
         if parallel_options is None:
             parallel_options = "CL+LIST"
-
 
         es_args = {
             'scenario': scenario,
@@ -140,7 +143,8 @@ class ES(object):
             # 'acq_optimizer': acquisition_function_optimizer,
             # 'acquisition_func': acquisition_function,
             'rng': rng,
-            'parallel_options': parallel_options
+            'parallel_options': parallel_options,
+            'intensifier_maker': intensifier_maker,
         }
 
         self.solver = ESOptimizer(**es_args)

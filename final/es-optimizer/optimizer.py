@@ -5,6 +5,9 @@ import math
 import random
 import logging
 
+import multiprocessing
+from rx import Observable
+from rx.concurrency import ThreadPoolScheduler
 import ConfigSpace
 import math
 from collections import Counter
@@ -33,7 +36,8 @@ class ESOptimizer(object):
                  intensifier: Intensifier,
                  aggregate_func: callable,
                  rng: np.random.RandomState,
-                 parallel_options: str):
+                 parallel_options: str,
+                 intensifier_maker=lambda x: ()):
 
         self._logger = logging.getLogger(self.__module__ + "." + self.__class__.__name__)
         self.incumbent = scenario.cs.get_default_configuration()
@@ -44,6 +48,7 @@ class ESOptimizer(object):
         self.aggregate_func = aggregate_func
         self.rng = rng
         self.parallel_options = parallel_options
+        self.intensifier_maker = intensifier_maker
 
     def start(self):
         self.stats.start_timing()
@@ -109,13 +114,49 @@ class ESOptimizer(object):
     def race_configs(self, set_of_conf, incumbent, time_left):
         """Races the challengers agains each other to determine incumbent
         """
+        start_time = time.time()
+        time_bound = max(self.intensifier._min_time, time_left, 10)
+        list_of_champions = []  # containing pairs of the form (incumbent, performance)
+        optimal_thread_count = multiprocessing.cpu_count()
+        pool_scheduler = ThreadPoolScheduler(optimal_thread_count - 1)
+
+        def local_race(intensifier):
+            def local_race_with_intensifier(c):
+                if time.time() - start_time > time_bound:
+                    return c, np.infty
+                return intensifier.intensify(
+                    challengers=[c],
+                    incumbent=incumbent,
+                    run_history=self.runhistory,
+                    aggregate_func=self.aggregate_func,
+                    time_bound=time_bound
+                )
+            return local_race_with_intensifier
+
         try:
             # Run all in parallel for list of instances
             if "+LIST" in self.parallel_options:
-                pass
+                logging.info('Race different configurations in parallel')
+                for conf in set_of_conf:
+                    for instance in self.scenario.train_insts:
+                        Observable.of(conf).map(local_race(self.intensifier_maker([instance]))) \
+                            .subscribe_on(pool_scheduler) \
+                            .subscribe(lambda x: list_of_champions.append(x))
+                while len(list_of_champions) == 0:
+                    time.sleep(time_bound)
+                    print('number of champions:', len(list_of_champions))
+                return min(list_of_champions, key=lambda x: x[1])
             # Run all in parallel for each instance
             elif "+EACH" in self.parallel_options:
-                pass
+                logging.info('Race different configurations in parallel')
+                for conf in set_of_conf:
+                    Observable.of(conf).map(local_race(self.intensifier)) \
+                        .subscribe_on(pool_scheduler) \
+                        .subscribe(lambda x: list_of_champions.append(x))
+                while len(list_of_champions) == 0:
+                    time.sleep(time_bound)
+                    print('number of champions:', len(list_of_champions))
+                return min(list_of_champions, key=lambda x: x[1])
             # Independent race against incumbent
             elif "+INDP" in self.parallel_options:
                 pass
@@ -123,16 +164,16 @@ class ESOptimizer(object):
                 ValueError("Wrong Combination Type")
 
             # dummy solution
-            best, inc_perf = self.intensifier.intensify(
-                challengers=set_of_conf,
-                incumbent=incumbent,
-                run_history=self.runhistory,
-                aggregate_func=self.aggregate_func,
-                time_bound=max(self.intensifier._min_time, time_left)
-            )
-            return best, inc_perf
-        except:
-            return
+            # best, inc_perf = self.intensifier.intensify(
+            #     challengers=set_of_conf,
+            #     incumbent=incumbent,
+            #     run_history=self.runhistory,
+            #     aggregate_func=self.aggregate_func,
+            #     time_bound=max(self.intensifier._min_time, time_left)
+            # )
+            # return best, inc_perf
+        except TypeError as e:
+            raise e
 
     def _get_timebound_for_intensification(self, time_spent):
         """Calculate time left for intensify from the time spent on
