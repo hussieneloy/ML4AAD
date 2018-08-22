@@ -47,7 +47,8 @@ class ES(object):
                  runhistory2epm: AbstractRunHistory2EPM=None,
                  rng: typing.Union[np.random.RandomState, int]=None,
                  run_id: int=1,
-                 parallel_options: str=None):
+                 parallel_options: str=None,
+                 cores: int=2):
 
         self._logger = logging.getLogger(self.__module__ + "." + self.__class__.__name__)
         aggregate_func = average_cost
@@ -233,6 +234,7 @@ class ES(object):
             'rng': rng,
             'parallel_options': parallel_options,
             'intensifier_maker': intensifier_maker,
+            'cores': cores
         }
 
         self.solver = ESOptimizer(**es_args)
