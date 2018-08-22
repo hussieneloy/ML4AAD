@@ -91,11 +91,14 @@ class ESOptimizer(object):
 
             start_time = time.time()
 
+            # Culling the number of challengers
+            if len(challengers) == 10:
+                challengers = self.scenario.cs.sample_configuration(size=5)
+
             # Find configurations to evaluate next
             self._logger.info("Searching for next configuration")
             challenger = self.choose_next(challengers)
             challengers.append(challenger)
-
 
             time_spent = time.time() - start_time
             self._logger.info("Time spent for choosing configuration: %s" % (time_spent))
@@ -229,7 +232,13 @@ class ESOptimizer(object):
         # Get all instances available
         instances = self.intensifier.instances
         # A copy from the runhistory in order not to ruin the original with lies
-        tmp_runhistory = copy.deepcopy(self.runhistory)
+        copied_data = dict(self.runhistory.data)
+        tmp_runhistory = RunHistory(aggregate_func=self.aggregate_func)
+        tmp_runhistory.data = copied_data
+        tmp_runhistory.ids_config = self.runhistory.ids_config
+        tmp_runhistory.config_ids = self.runhistory.config_ids
+        tmp_runhistory.cost_per_config = self.runhistory.cost_per_config
+        tmp_runhistory.runs_per_config = self.runhistory.runs_per_config
       
         for config in configs:
             # Get runs of the current configuration
@@ -237,6 +246,8 @@ class ESOptimizer(object):
             conf_runs = [x[0] for x in conf_runs]
             # Get the available runs for the current configuration
             available_insts = instances - set(conf_runs)
+            if len(available_insts) == 0:
+                available_insts = instances
             # Choose random instance
             random_idx = np.random.randint(0, len(available_insts))
             random_inst = list(available_insts)[random_idx]
@@ -248,6 +259,7 @@ class ESOptimizer(object):
             # Add hallucination to the fake runhistory
             tmp_runhistory.add(config=config, cost=lie, 
             time=0.0, status=StatusType.SUCCESS, instance_id=random_inst)
+        
         
         # Training the EPM with the temporary runhistory
         X, Y = self.rh2EPM.transform(tmp_runhistory)
@@ -356,6 +368,51 @@ class ESOptimizer(object):
         if config_runs == 0:
             random_config = self.scenario.cs.sample_configuration()
             return random_config, 0.0
+        types, bounds = np.array([0]), np.array([[0.0, 1.0]])
+        local_model = RandomForestWithInstances(types=types, bounds=bounds,
+                                              instance_features=None,
+                                              seed=12345,pca_components=12345,
+                                              ratio_features=1,
+                                              num_trees=1000,
+                                              min_samples_split=1,
+                                              min_samples_leaf=1,
+                                              max_depth=100000,
+                                              do_bootstrapping=True,
+                                              n_points_per_tree=-1,
+                                              eps_purity=0)
+        local_acq = EI(model=local_model)
+        local_optimizer = LocalSearch(local_acq, self.scenario.cs, 
+            np.random.RandomState(seed=self.rng.randint(MAXINT)))
+        tae_runner = ExecuteTARunOld(ta=self.scenario.ta,
+                                         stats=self.stats,
+                                         run_obj=self.scenario.run_obj,
+                                         runhistory=self.runhistory,
+                                         par_factor=self.scenario.par_factor,
+                                         cost_for_crash=self.scenario.cost_for_crash)
+        x_axis = np.arange(config_runs)
+        x_axis = np.array([[float(x)] for x in x_axis])
+        costs = np.array([[y] for y in conf_costs])
+        local_model.train(x_axis, costs)
+        min_so_far = np.amin(conf_costs)
+        local_acq.update(model=local_model, eta=min_so_far)
+        possible_neighbors = local_optimizer.maximize(self.runhistory, self.stats, 10)
+        cand_costs = np.zeros(10)
+        conf_insts = []
+        for i in range(10):
+            conf.insts.append([])
+        beta_t = 0.2
+        instances = self.intensifier.instances
+        for iteration in range(5):
+            rand_inst = random.choice(instances)
+            for cand in range(10):
+                
+
+        """
+        conf_costs = _cost(config, self.runhistory)
+        config_runs = len(conf_costs)
+        if config_runs == 0:
+            random_config = self.scenario.cs.sample_configuration()
+            return random_config, 0.0
         computed_instances = self.runhistory.get_runs_for_config(config)
         answer = config
         current_config = config
@@ -376,7 +433,7 @@ class ESOptimizer(object):
                                               min_samples_split=1,
                                               min_samples_leaf=1,
                                               max_depth=100000,
-                                              do_bootstrapping=False,
+                                              do_bootstrapping=True,
                                               n_points_per_tree=-1,
                                               eps_purity=0)
         local_acq = EI(model=local_model)
@@ -410,9 +467,12 @@ class ESOptimizer(object):
                     instance_specific=self.scenario.instance_specific.get(
                         inst, "0"))
                 except:
+                    self.stats.print_stats(debug_out=True)
                     break
                 neighbor_costs.append(cost)
                 
+            if len(neighbor_costs) == 0:
+                continue
             neighbor_value = self.ucb_func(neighbor_costs, beta_t)
             if neighbor_value <= answer_cost:
                 answer = current_config
@@ -420,7 +480,7 @@ class ESOptimizer(object):
             beta_t += 0.1
             conf_costs = neighbor_costs
         return answer, answer_cost
-
+        """
 
     def ucb_func(self, values, beta):
         miu = np.mean(values)
