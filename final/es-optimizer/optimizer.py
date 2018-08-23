@@ -62,6 +62,7 @@ class ESOptimizer(object):
         self.incumbent = scenario.cs.get_default_configuration()
         self.scenario = scenario
         self.stats = stats
+        self.cores = cores
         self.rh2EPM = runhistory2epm
         self.runhistory = runhistory
         self.intensifier = intensifier
@@ -150,7 +151,7 @@ class ESOptimizer(object):
         list_of_champions = []  # containing pairs of the form (incumbent, performance)
         # optimal_thread_count = multiprocessing.cpu_count()
         # pool_scheduler = ThreadPoolScheduler(optimal_thread_count - 1)
-        pool_scheduler = ThreadPoolScheduler(this.cores - 1)
+        pool_scheduler = ThreadPoolScheduler(self.cores)
 
         def local_race(intensifier):
             def local_race_with_intensifier(c):
