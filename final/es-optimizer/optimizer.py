@@ -90,7 +90,7 @@ class ESOptimizer(object):
         while True:
 
             start_time = time.time()
-
+            
             # Culling the number of challengers
             if len(challengers) == 10:
                 challengers = self.scenario.cs.sample_configuration(size=5)
@@ -107,7 +107,11 @@ class ESOptimizer(object):
             time_left = self._get_timebound_for_intensification(time_spent)
             self._logger.info("Time left for intensification: %s" % (time_left))
             self._logger.info("Intensifying...")
+            
             self.incumbent, inc_perf = self.race_configs(challengers, self.incumbent, time_left)
+            if self.incumbent in challengers:
+                challengers.remove(self.incumbent)
+                challengers.append(self.scenario.cs.sample_configuration())
             logging.debug("Remaining budget: %f (wallclock), %f (ta costs), %f (target runs)" % (
                 self.stats.get_remaing_time_budget(),
                 self.stats.get_remaining_ta_budget(),
