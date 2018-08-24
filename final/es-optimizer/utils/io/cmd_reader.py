@@ -45,6 +45,8 @@ class CMDReader(object):
                                        "FA+LIST", "FA+EACH", "FA+INDP",
                                        "TS+LIST", "TS+EACH", "TS+INDP"],
                               help="Combinations of Parallel Bayesian Optimization and Racing")
+        req_opts.add_argument("--cores", default=2, choices=[1, 2, 4, 8],
+                              help="how many cores to use for parallel execution")
 
         # deleted everything with warmstart (not needed)
         args_, misc = parser.parse_known_args()

@@ -57,7 +57,8 @@ class ESCLI(object):
             scenario=scen,
             rng=np.random.RandomState(args_.seed),
             run_id=args_.seed,
-            parallel_options=args_.parallel_options
+            parallel_options=args_.parallel_options,
+            cores=args_.cores
         )
 
         try:

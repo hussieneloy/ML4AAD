@@ -55,12 +55,14 @@ class ESOptimizer(object):
                  acquisition_func: AbstractAcquisitionFunction,
                  rng: np.random.RandomState,
                  parallel_options: str,
+                 cores: int,
                  intensifier_maker=lambda x: ()):
 
         self._logger = logging.getLogger(self.__module__ + "." + self.__class__.__name__)
         self.incumbent = scenario.cs.get_default_configuration()
         self.scenario = scenario
         self.stats = stats
+        self.cores = cores
         self.rh2EPM = runhistory2epm
         self.runhistory = runhistory
         self.intensifier = intensifier
@@ -151,8 +153,9 @@ class ESOptimizer(object):
         start_time = time.time()
         time_bound = max(self.intensifier._min_time, time_left, 10)
         list_of_champions = []  # containing pairs of the form (incumbent, performance)
-        optimal_thread_count = multiprocessing.cpu_count()
-        pool_scheduler = ThreadPoolScheduler(optimal_thread_count - 1)
+        # optimal_thread_count = multiprocessing.cpu_count()
+        # pool_scheduler = ThreadPoolScheduler(optimal_thread_count - 1)
+        pool_scheduler = ThreadPoolScheduler(self.cores)
 
         def local_race(intensifier):
             def local_race_with_intensifier(c):
