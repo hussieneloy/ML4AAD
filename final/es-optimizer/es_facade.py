@@ -16,6 +16,7 @@ from smac.runhistory.runhistory2epm import AbstractRunHistory2EPM, \
     RunHistory2EPM4LogCost, RunHistory2EPM4Cost
 from smac.intensification.intensification import Intensifier
 from smac.utils.io.traj_logging import TrajLogger
+from smac.epm.rfr_imputator import RFRImputator
 from smac.configspace import Configuration
 from smac.optimizer.objective import average_cost
 from smac.epm.base_epm import AbstractEPM
@@ -234,7 +235,8 @@ class ES(object):
             'rng': rng,
             'parallel_options': parallel_options,
             'intensifier_maker': intensifier_maker,
-            'cores': cores
+            'cores': cores,
+            'traj_logger': traj_logger,
         }
 
         self.solver = ESOptimizer(**es_args)
