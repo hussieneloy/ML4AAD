@@ -19,3 +19,4 @@ The other way is from the inside of aclib2. We included all the necessary files 
 
 ## Results 
 
+The results are summarized in our report, more plots and results can be found in the folder results. The runs used for our final conclusion can be found in there as zip files. In the results folder are several more folders with plots of the different benchmarks on different number of cores. There is one more compare folder, where the performance is compared depending on how many cores were used.
