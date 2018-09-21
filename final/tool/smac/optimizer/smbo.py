@@ -14,8 +14,6 @@ import copy
 import multiprocessing
 
 from multiprocessing import Process, Queue, Pool, Manager
-from rx import Observable
-from rx.concurrency import ThreadPoolScheduler
 from smac.configspace import Configuration, get_one_exchange_neighbourhood
 from smac.epm.rf_with_instances import RandomForestWithInstances
 from smac.initial_design.initial_design import InitialDesign
