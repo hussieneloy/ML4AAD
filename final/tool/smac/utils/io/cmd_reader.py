@@ -60,7 +60,7 @@ class CMDReader(object):
                               help=SUPPRESS)# list of trajectory dump files, 
                                             # reads runhistory 
                                             # and uses final incumbent as challenger 
-        req_opts.add_argument("--num_parallel", default=1, type=int,
+        req_opts.add_argument("--num_parallel", default=8, type=int,
                               choices=[1, 2, 4, 8],
                               help="number of parallel runs")
         req_opts.add_argument("--parallel_scenario", default="CL+EACH",

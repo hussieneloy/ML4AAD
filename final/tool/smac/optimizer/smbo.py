@@ -415,20 +415,29 @@ class SMBO(object):
             print("#######################")
             if len(challengers) == 1:
                 break
-        if challengers[0] is not self.incumbent:
+
+        winner = challengers[0]
+        winner_cost = self.runhistory.get_cost(winner)
+        # print("WINNERS COST: %s" % (winner_cost))
+        incumbent_cost = self.runhistory.get_cost(self.incumbent)
+        # print("INCUMBENT COST: %s" % (incumbent_cost))
+        winner_runs = self.runhistory.get_runs_for_config(winner)
+        incumbent_runs = self.runhistory.get_runs_for_config(self.incumbent)
+        # print("WINNER RUNS: %s" % (winner_runs))
+        # print("INCUMBENT RUNS: %s" % (incumbent_runs))
+        winner_cost /= float(len(winner_runs))
+        incumbent_cost /= float(len(incumbent_runs))
+        
+        if winner_cost < incumbent_cost:
             self.stats.inc_changed += 1
-            if self.racing_results[0][0] == challengers[0]:
-                new_inc_cost = self.racing_results[0][1]
-            else:
-                new_inc_cost = self.racing_results[1][1]
-            self.traj_logger.add_entry(new_inc_cost,
-                                       self.runhistory.config_ids[challengers[0]],
-                                       challengers[0])
+            self.traj_logger.add_entry(winner_cost,
+                                       self.runhistory.config_ids[winner],
+                                       winner)
             self.logger.info("Changed Incumbent")
+            return winner, winner_cost
         else:
             self.logger.info("Incumbent won the racing.")
-        self.logger.info("TA RUNS: %s" % (self.stats.ta_runs))
-        return challengers[0], self.runhistory.get_cost(challengers[0])
+            return self.incumbent, incumbent_cost
 
     def race(self, queue):
         while True:
